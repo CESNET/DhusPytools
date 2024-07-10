@@ -255,7 +255,7 @@ def regenerate_href_links(stacfile_path, metadata_dir, product_url):
                 outfile.write('"'.join(split_line))
             else:
                 outfile.write(line)
-    os.replace(new_file,stacfile_path)
+    os.replace(new_file, stacfile_path)
 
 
 def upload_to_catalogue(stac_host, collection, platform, stac_filepath, product_id, err_prefix, succ_prefix):
@@ -326,7 +326,7 @@ def main():
             fetch_nested_s2_files(safe_manifest, product_url, metadata_dir)
             item = stactools.sentinel2.stac.create_item(granule_href=metadata_dir)
         elif platform.lower() == "s3":
-            item = stactools.sentinel3.stac.create_item(granule_href=metadata_dir, skip_nc=True)
+            item = stactools.sentinel3.stac.create_item(granule_href=metadata_dir)
         elif platform.lower() == "s5":
             fetch_s5_metadata(product_url, title, metadata_dir)
             item = stactools.sentinel5p.stac.create_item(os.path.join(metadata_dir, title))
