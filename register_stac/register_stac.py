@@ -61,8 +61,6 @@ def parse_arguments():
                         help='Enables saving data locally.')
 
     args = parser.parse_args()
-    if args.push and not args.stacHost:
-        raise Exception('--push requires --stacHost argument')
     if not args.push and not args.save:
         raise Exception('--push or --save required to take any action')
     return args
@@ -134,7 +132,7 @@ def fetch_product_data(sentinel_host, product_id, metadata_dir):
     if not title or not product_url:
         raise Exception(f"Missing required attributes for product {product_id}.")
 
-    print(f"Fetched product data for product (UUID {product_id}):\n"
+    print(f"Parsed product data for product (UUID {product_id}):\n"
           f"*  Title ID: {title}\n"
           f"*  Platform: {platform}\n"
           f"*  Collection: {collection}\n"
@@ -192,12 +190,12 @@ def fetch_platform_metadata(product_url, metadata_dir, platform):
         request_with_progress(source_url, output_file)
 
 
-def fetch_nested_s1_files(safe_manifest, product_url, metadata_dir):
+def fetch_nested_s1_files(metadata, product_url, metadata_dir):
     """
-    From the processed manifest file downloads the missing metadata files, which we know
+    From the processed metadata file downloads the missing metadata files, which we know
     the stactools will be working with.
     """
-    filepaths = safe_manifest.annotation_hrefs + safe_manifest.noise_hrefs + safe_manifest.calibration_hrefs
+    filepaths = metadata.annotation_hrefs + metadata.noise_hrefs + metadata.calibration_hrefs
     for ref_name, filepath in filepaths:
         url_path_extension = filepath.split(f"{metadata_dir}/")[1]
         url_path_segments = url_path_extension.split("/")
@@ -206,15 +204,15 @@ def fetch_nested_s1_files(safe_manifest, product_url, metadata_dir):
         request_with_progress(nested_file_url, filepath)
 
 
-def fetch_nested_s2_files(safe_manifest, product_url, metadata_dir):
+def fetch_nested_s2_files(metadata, product_url, metadata_dir):
     """
-    From the processed manifest file downloads the missing metadata files, which we know
+    From the processed metadata file downloads the missing metadata files, which we know
     the stactools will be working with.
     """
-    filepaths = [safe_manifest.product_metadata_href,
-                 safe_manifest.granule_metadata_href,
-                 safe_manifest.inspire_metadata_href,
-                 safe_manifest.datastrip_metadata_href,
+    filepaths = [metadata.product_metadata_href,
+                 metadata.granule_metadata_href,
+                 metadata.inspire_metadata_href,
+                 metadata.datastrip_metadata_href,
                  ]
     for filepath in filepaths:
         url_path_extension = filepath.split(f"{metadata_dir}/")[1]
@@ -247,7 +245,7 @@ def regenerate_href_links(stacfile_path, metadata_dir, product_url):
     with (open(stacfile_path, 'r') as infile, open(new_file, 'w') as outfile):
         for line in infile:
             if metadata_dir in line:
-                split_line = line.split('"')  # [' ', 'href', ': ', 'fullpath', '\n']
+                split_line = line.split('"')  # [' ', 'href', ': ', 'matadata_dir/resource/path', '\n']
                 url_path_segments = split_line[-2].split(f"{metadata_dir}/")[1].split("/")
                 correct_link = product_url + ''.join(
                     f"/Nodes('{segment}')" for segment in url_path_segments) + "/$value"
@@ -258,31 +256,36 @@ def regenerate_href_links(stacfile_path, metadata_dir, product_url):
     os.replace(new_file, stacfile_path)
 
 
-def upload_to_catalogue(stac_host, collection, platform, stac_filepath, product_id, err_prefix, succ_prefix):
+def get_auth_token(url):
+    # todo
+    pass
+
+
+def upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_prefix, succ_prefix):
     """
     Uploads the stac file to the catalogue.
     Reports progress in the preconfigured files suffixed by the current date.
     """
-    url = f"{stac_host}/collections/${collection[{platform}]}/items"
+    url = f"{stac_host}/collections/mp-{collection}/items"  # todo remove mp - just for resto testing
     print(f"Uploading STAC data to {url}")
-    response = requests.post(stac_host, files={'file': open(stac_filepath, 'rb')})
-    rundate = datetime.now().strftime('%Y-%m-%d')
 
-    if response.ok:
-        succ_file = succ_prefix + rundate
-        create_missing_dir(os.path.dirname(succ_file))
-        with open(succ_file, 'a') as f:
-            f.write(f"{collection},{product_id}\n")
-    else:
-        err_file = err_prefix + rundate
-        create_missing_dir(os.path.dirname(err_file))
-        with open(err_file, 'a') as f:
-            f.write(f"{collection},{product_id},{response.status_code}\n")
-        if response.status_code == 404:
-            raise Exception(f"Collection {collection} apparently does not exist on the server!")
-        elif response.status_code == 409:
-            raise Exception(f"Product {product_id} already registered on the server!")
+    token = get_auth_token(f"{stac_host}/auth")
+
+    with open(stac_filepath, 'r') as file:
+        json_data = file.read()
+        response = requests.post(url, data=json_data, headers={'Authorization': f'Bearer {token}'})
+        rundate = datetime.now().strftime('%Y-%m-%d')
+
+        if response.ok:
+            succ_file = succ_prefix + rundate
+            create_missing_dir(os.path.dirname(succ_file))
+            with open(succ_file, 'a') as f:
+                f.write(f"{collection},{product_id}\n")
         else:
+            err_file = err_prefix + rundate
+            create_missing_dir(os.path.dirname(err_file))
+            with open(err_file, 'a') as f:
+                f.write(f"{collection},{product_id},{response.status_code}\n")
             raise Exception(f"Request to upload STAC file failed with {response.status_code}.\n{response.text}")
 
 
@@ -297,14 +300,19 @@ def main():
     if args.save and config.get("STAC_LOCAL_DIR") is None and args.stacLocalDir is None:
         raise Exception("Flag --save was provided, but STAC_LOCAL_DIR option not configured and not specified "
                         "in the --stacLocalDir argument!")
+
     stac_storage = args.stacLocalDir or config.get("STAC_LOCAL_DIR")
     if stac_storage is not None:
         create_missing_dir(os.path.dirname(stac_storage))
+
     succ_prefix = config.get("SUCC_PREFIX")
     err_prefix = config.get("ERR_PREFIX")
     if args.push and (succ_prefix is None or err_prefix is None):
         raise Exception("Flag --push was provided, but SUCC_PREFIX and ERR_PREFIX need to be set in the configuration "
                         "file!")
+
+    if args.push and not stac_host:
+        raise Exception('--push requires --stacHost argument or STAC_HOST configuration option to be set!')
 
     with (tempfile.TemporaryDirectory() as metadata_dir):
         print(f"Created temporary directory: {metadata_dir}")
@@ -318,15 +326,15 @@ def main():
         fetch_platform_metadata(product_url, metadata_dir, platform)
 
         if platform.lower() == "s1":
-            safe_manifest = stactools.sentinel1.grd.stac.MetadataLinks(metadata_dir)
-            fetch_nested_s1_files(safe_manifest, product_url, metadata_dir)
+            metadata = stactools.sentinel1.grd.stac.MetadataLinks(metadata_dir)
+            fetch_nested_s1_files(metadata, product_url, metadata_dir)
             item = stactools.sentinel1.grd.stac.create_item(granule_href=metadata_dir)
         elif platform.lower() == "s2":
             safe_manifest = stactools.sentinel2.stac.SafeManifest(metadata_dir)
             fetch_nested_s2_files(safe_manifest, product_url, metadata_dir)
             item = stactools.sentinel2.stac.create_item(granule_href=metadata_dir)
         elif platform.lower() == "s3":
-            item = stactools.sentinel3.stac.create_item(granule_href=metadata_dir)
+            item = stactools.sentinel3.stac.create_item(granule_href=metadata_dir, skip_nc=True)
         elif platform.lower() == "s5":
             fetch_s5_metadata(product_url, title, metadata_dir)
             item = stactools.sentinel5p.stac.create_item(os.path.join(metadata_dir, title))
@@ -342,10 +350,9 @@ def main():
         regenerate_href_links(stac_filepath, metadata_dir, product_url)
 
         if args.push:
-            upload_to_catalogue(stac_host, collection, platform, stac_filepath, product_id, err_prefix, succ_prefix)
-
+            #upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_prefix, succ_prefix)
+            pass
         print("Finished")
-        exit()
 
 
 if __name__ == "__main__":
