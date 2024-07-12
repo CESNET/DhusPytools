@@ -5,10 +5,6 @@ and transforms it into a [STAC](https://stacspec.org/en) format. It can publish 
 The transformation is done by imported [stactools](https://github.com/stac-utils/stactools) modules.
 
 
-## Requirements
-The required libraries are listed in the requirements.txt file, you can install them with pip:
-`pip install -r ./register_stac/requirements.txt`
-
 ## Configuration
 There are several ways to configure the script's behaviour:
 

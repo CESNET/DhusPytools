@@ -1,9 +1,0 @@
-# Running with Python 3.10
-stactools-sentinel1~=0.3.0
-stactools-sentinel2~=0.2.0
-stactools-sentinel3~=0.3.0
-stactools-sentinel5p~=0.2.0
-defusedxml~=0.7.1
-PyYAML~=6.0.1
-requests~=2.32.3
-tqdm~=2.2.3

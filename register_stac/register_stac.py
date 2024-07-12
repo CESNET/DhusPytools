@@ -12,10 +12,12 @@ from urllib.parse import urlparse
 import defusedxml.ElementTree
 import requests
 import stactools.sentinel1.grd.stac
+import stactools.sentinel1.slc.stac
 import stactools.sentinel2.stac
 import stactools.sentinel3.stac
 import stactools.sentinel5p.stac
 import yaml
+from requests import Session
 from tqdm import tqdm
 
 import sentinel_stac
@@ -256,9 +258,14 @@ def regenerate_href_links(stacfile_path, metadata_dir, product_url):
     os.replace(new_file, stacfile_path)
 
 
-def get_auth_token(url):
-    # todo
-    pass
+def get_auth_token(token_url):
+    """
+    Gets token for communication with API from token url.
+    """
+    response = requests.get(token_url)
+    if not response.ok:
+        raise Exception(f"Could not obtain API token from {token_url}")
+    return response.json()["token"]
 
 
 def upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_prefix, succ_prefix):
@@ -266,15 +273,18 @@ def upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_pr
     Uploads the stac file to the catalogue.
     Reports progress in the preconfigured files suffixed by the current date.
     """
-    url = f"{stac_host}/collections/mp-{collection}/items"  # todo remove mp - just for resto testing
+    url = f"{stac_host}/collections/{collection}/items"
     print(f"Uploading STAC data to {url}")
 
     token = get_auth_token(f"{stac_host}/auth")
 
     with open(stac_filepath, 'r') as file:
         json_data = file.read()
-        response = requests.post(url, data=json_data, headers={'Authorization': f'Bearer {token}'})
         rundate = datetime.now().strftime('%Y-%m-%d')
+        token_session = Session()
+        token_session.trust_env = False  # need to overwrite the authorization header, otherwise BA is used
+        token_session.headers.update({"Authorization": f"Bearer {token}"})
+        response = token_session.post(url, data=json_data)
 
         if response.ok:
             succ_file = succ_prefix + rundate
@@ -309,7 +319,7 @@ def main():
     err_prefix = config.get("ERR_PREFIX")
     if args.push and (succ_prefix is None or err_prefix is None):
         raise Exception("Flag --push was provided, but SUCC_PREFIX and ERR_PREFIX need to be set in the configuration "
-                        "file!")
+                        "file for logging!")
 
     if args.push and not stac_host:
         raise Exception('--push requires --stacHost argument or STAC_HOST configuration option to be set!')
@@ -319,16 +329,21 @@ def main():
 
         title, product_url, platform, collection = fetch_product_data(sentinel_host, product_id, metadata_dir)
 
-        # create product archive folder
         metadata_dir = os.path.join(metadata_dir, title)
         os.mkdir(metadata_dir)
 
         fetch_platform_metadata(product_url, metadata_dir, platform)
 
         if platform.lower() == "s1":
-            metadata = stactools.sentinel1.grd.stac.MetadataLinks(metadata_dir)
-            fetch_nested_s1_files(metadata, product_url, metadata_dir)
-            item = stactools.sentinel1.grd.stac.create_item(granule_href=metadata_dir)
+            product_type = title.split("_")[2]
+            if product_type.lower() == "slc":
+                metadata = stactools.sentinel1.slc.stac.SLCMetadataLinks(metadata_dir)
+                fetch_nested_s1_files(metadata, product_url, metadata_dir)
+                item = stactools.sentinel1.slc.stac.create_item(granule_href=metadata_dir)
+            else:
+                metadata = stactools.sentinel1.grd.stac.MetadataLinks(metadata_dir)
+                fetch_nested_s1_files(metadata, product_url, metadata_dir)
+                item = stactools.sentinel1.grd.stac.create_item(granule_href=metadata_dir)
         elif platform.lower() == "s2":
             safe_manifest = stactools.sentinel2.stac.SafeManifest(metadata_dir)
             fetch_nested_s2_files(safe_manifest, product_url, metadata_dir)
@@ -341,7 +356,7 @@ def main():
         else:
             raise Exception(f"Unknown platform {platform}!")
 
-        stac_storage = stac_storage if stac_storage is not None else metadata_dir
+        stac_storage = stac_storage if args.save else metadata_dir
         stac_filepath = os.path.join(stac_storage, "{}.json".format(item.id))
 
         print(f"Writing metadata to file: {stac_filepath}")
@@ -350,8 +365,7 @@ def main():
         regenerate_href_links(stac_filepath, metadata_dir, product_url)
 
         if args.push:
-            #upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_prefix, succ_prefix)
-            pass
+            upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_prefix, succ_prefix)
         print("Finished")
 
 
