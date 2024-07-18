@@ -99,7 +99,7 @@ def request_with_progress(url, output_path):
     progress_bar = tqdm(total=total_size,
                         unit='iB',
                         unit_scale=True,
-                        desc=f"Fetching file {output_path.split(os.sep)[-1]}",
+                        desc=f"Fetching file {output_path.split('/')[-1]}",
                         leave=True,
                         file=sys.stdout)
 
@@ -199,9 +199,8 @@ def fetch_nested_s1_files(metadata, product_url, metadata_dir):
     """
     filepaths = metadata.annotation_hrefs + metadata.noise_hrefs + metadata.calibration_hrefs
     for ref_name, filepath in filepaths:
-        filepath = filepath.replace("/", os.sep)  # change form from manifest to file system
-        url_path_extension = filepath.split(f"{metadata_dir}{os.sep}")[1]
-        url_path_segments = url_path_extension.split(os.sep)
+        url_path_extension = filepath.split(f"{metadata_dir}{'/'}")[1]
+        url_path_segments = url_path_extension.split('/')
         nested_file_url = product_url + ''.join(f"/Nodes('{segment}')" for segment in url_path_segments) + "/$value"
         create_missing_dir(os.path.dirname(filepath))
         request_with_progress(nested_file_url, filepath)
@@ -218,9 +217,8 @@ def fetch_nested_s2_files(metadata, product_url, metadata_dir):
                  metadata.datastrip_metadata_href,
                  ]
     for filepath in filepaths:
-        filepath = filepath.replace("/", os.sep)  # change form from manifest to file system
-        url_path_extension = filepath.split(f"{metadata_dir}{os.sep}")[1]
-        url_path_segments = url_path_extension.split(os.sep)
+        url_path_extension = filepath.split(f"{metadata_dir}{'/'}")[1]
+        url_path_segments = url_path_extension.split('/')
         nested_file_url = product_url + ''.join(f"/Nodes('{segment}')" for segment in url_path_segments) + "/$value"
         create_missing_dir(os.path.dirname(filepath))
         request_with_progress(nested_file_url, filepath)
@@ -243,14 +241,14 @@ def regenerate_href_links(stacfile_path, metadata_dir, product_url):
     from the hrefs, or the change does not affect all the hrefs.
     """
     print("Regenerating href links")
-    new_file = stacfile_path.split(os.sep)
+    new_file = stacfile_path.split('/')
     new_file[-1] = 'new_' + new_file[-1]
-    new_file = os.path.join(os.sep, *new_file)
+    new_file = os.path.join('/', *new_file)
     with (open(stacfile_path, 'r') as infile, open(new_file, 'w') as outfile):
         for line in infile:
             if metadata_dir in line:
                 split_line = line.split('"')  # [' ', 'href', ': ', 'matadata_dir/resource/path', '\n']
-                url_path_segments = split_line[-2].split(f"{metadata_dir}{os.sep}")[1].split("/")
+                url_path_segments = split_line[-2].split(f"{metadata_dir}{'/'}")[1].split("/")
                 correct_link = product_url + ''.join(
                     f"/Nodes('{segment}')" for segment in url_path_segments) + "/$value"
                 split_line[-2] = correct_link
