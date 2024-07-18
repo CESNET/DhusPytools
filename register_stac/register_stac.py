@@ -199,6 +199,7 @@ def fetch_nested_s1_files(metadata, product_url, metadata_dir):
     """
     filepaths = metadata.annotation_hrefs + metadata.noise_hrefs + metadata.calibration_hrefs
     for ref_name, filepath in filepaths:
+        filepath = filepath.replace("/", os.sep)  # change form from manifest to file system
         url_path_extension = filepath.split(f"{metadata_dir}{os.sep}")[1]
         url_path_segments = url_path_extension.split(os.sep)
         nested_file_url = product_url + ''.join(f"/Nodes('{segment}')" for segment in url_path_segments) + "/$value"
@@ -217,6 +218,7 @@ def fetch_nested_s2_files(metadata, product_url, metadata_dir):
                  metadata.datastrip_metadata_href,
                  ]
     for filepath in filepaths:
+        filepath = filepath.replace("/", os.sep)  # change form from manifest to file system
         url_path_extension = filepath.split(f"{metadata_dir}{os.sep}")[1]
         url_path_segments = url_path_extension.split(os.sep)
         nested_file_url = product_url + ''.join(f"/Nodes('{segment}')" for segment in url_path_segments) + "/$value"
