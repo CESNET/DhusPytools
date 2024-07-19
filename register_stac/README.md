@@ -4,6 +4,9 @@ The **register_stack.py** script fetches Sentinel 1, 2, 3 and 5P metadata from a
 and transforms it into a [STAC](https://stacspec.org/en) format. It can publish the results to a STAC catalogue.
 The transformation is done by imported [stactools](https://github.com/stac-utils/stactools) modules.
 
+## Dependencies
+Install dependent libraries with `pip install -r requirements.txt`. Unfortunately, there are dependency conflicts
+on the newer versions of sentinel modules, therefore the newest ones cannot be used together.
 
 ## Configuration
 There are several ways to configure the script's behaviour:
