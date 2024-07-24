@@ -5,8 +5,7 @@ and transforms it into a [STAC](https://stacspec.org/en) format. It can publish 
 The transformation is done by imported [stactools](https://github.com/stac-utils/stactools) modules.
 
 ## Dependencies
-Install dependent libraries with `pip install -r requirements.txt`. Unfortunately, there are dependency conflicts
-on the newer versions of sentinel modules, therefore the newest ones cannot be used together.
+Install dependent libraries with `pip install -r requirements.txt`.
 
 ## Configuration
 There are several ways to configure the script's behaviour:

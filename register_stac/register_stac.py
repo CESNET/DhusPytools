@@ -13,22 +13,22 @@ import defusedxml.ElementTree
 import pystac
 import requests
 import stactools.sentinel1.grd.stac
-# import stactools.sentinel1.slc.stac
+import stactools.sentinel1.slc.stac
 import stactools.sentinel2.stac
 import stactools.sentinel3.stac
 import stactools.sentinel5p.stac
 import yaml
 from requests import Session
-# from stactools.sentinel3.file_extension_updated import FileExtensionUpdated
+from stactools.sentinel3.file_extension_updated import FileExtensionUpdated
 from tqdm import tqdm
 
 import sentinel_stac
 
 
-# Resolve issue in Sentinel3 library, which caused this method call to fail
-# def new_ext(cls, obj: pystac.Asset, add_if_missing: bool = False) -> "FileExtensionUpdated":
-#     return super(FileExtensionUpdated, cls).ext(obj, add_if_missing)
-# FileExtensionUpdated.ext = classmethod(new_ext)
+# Monkey-patch class method of Sentinel3 module to avoid casting error
+def new_ext(cls, obj: pystac.Asset, add_if_missing: bool = False):
+    return super(FileExtensionUpdated, cls).ext(obj, add_if_missing)
+FileExtensionUpdated.ext = classmethod(new_ext)
 
 
 def parse_arguments():
@@ -74,7 +74,6 @@ def parse_arguments():
     if not args.push and not args.save:
         raise Exception('--push or --save required to take any action')
     return args
-
 
 def read_configuration():
     """
@@ -206,7 +205,6 @@ def fetch_nested_s1_files(metadata, product_url, metadata_dir):
     the stactools will be working with.
     """
     filepaths = metadata.annotation_hrefs + metadata.noise_hrefs + metadata.calibration_hrefs
-    print(filepaths)
     for ref_name, filepath in filepaths:
         url_path_extension = filepath.split(f"{metadata_dir}{'/'}")[1]
         url_path_segments = url_path_extension.split('/')
@@ -347,22 +345,20 @@ def main():
 
         if platform.lower() == "s1":
             product_type = title.split("_")[2]
-            # if product_type.lower() == "slc":
-            #     metadata = stactools.sentinel1.slc.stac.SLCMetadataLinks(metadata_dir)
-            #     fetch_nested_s1_files(metadata, product_url, metadata_dir)
-            #     item = stactools.sentinel1.slc.stac.create_item(granule_href=metadata_dir)
-            # else:
-            # create empty directories stactools look into
-            create_missing_dir(os.path.join(metadata_dir,"annotation","calibration"))
-            metadata = stactools.sentinel1.grd.stac.MetadataLinks(metadata_dir)
-            fetch_nested_s1_files(metadata, product_url, metadata_dir)
-            item = stactools.sentinel1.grd.stac.create_item(granule_href=metadata_dir)
+            if product_type.lower() == "slc":
+                metadata = stactools.sentinel1.slc.stac.SLCMetadataLinks(metadata_dir)
+                fetch_nested_s1_files(metadata, product_url, metadata_dir)
+                item = stactools.sentinel1.slc.stac.create_item(granule_href=metadata_dir)
+            else:
+                metadata = stactools.sentinel1.grd.stac.MetadataLinks(metadata_dir)
+                fetch_nested_s1_files(metadata, product_url, metadata_dir)
+                item = stactools.sentinel1.grd.stac.create_item(granule_href=metadata_dir)
         elif platform.lower() == "s2":
             safe_manifest = stactools.sentinel2.stac.SafeManifest(metadata_dir)
             fetch_nested_s2_files(safe_manifest, product_url, metadata_dir)
             item = stactools.sentinel2.stac.create_item(granule_href=metadata_dir)
         elif platform.lower() == "s3":
-            item = stactools.sentinel3.stac.create_item(granule_href=metadata_dir)
+            item = stactools.sentinel3.stac.create_item(granule_href=metadata_dir, skip_nc=True)
         elif platform.lower() == "s5":
             fetch_s5_metadata(product_url, title, metadata_dir)
             item = stactools.sentinel5p.stac.create_item(os.path.join(metadata_dir, title))
