@@ -1,0 +1,11 @@
+defusedxml~=0.7.1
+PyYAML~=6.0.1
+requests~=2.32.3
+stactools-sentinel1~=0.8.0
+stactools-sentinel2~=0.6.4
+stactools-sentinel3~=0.4.0
+# sentinel5p has 0.2.1 stactools version dependency on pypi, using direct repository link instead
+stactools-sentinel5p @ git+https://github.com/stactools-packages/sentinel5p@a4d1e06
+tqdm~=4.66.4
+pyproj~=3.6.1
+netcdf4~=1.7.1post
