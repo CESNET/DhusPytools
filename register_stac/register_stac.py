@@ -67,8 +67,14 @@ def parse_arguments():
                         help='Enables pushing data to the catalogue at --stacHost.')
     parser.add_argument('-s',
                         '--save',
+                        required=False,
                         action='store_true',
                         help='Enables saving data locally.')
+    parser.add_argument('-o',
+                        '--overwrite',
+                        action='store_true',
+                        required=False,
+                        help='Include this flag to overwrite existing entries in the STAC catalogue.')
 
     args = parser.parse_args()
     if not args.push and not args.save:
@@ -276,7 +282,32 @@ def get_auth_token(token_url):
     return response.json()["token"]
 
 
-def upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_prefix, succ_prefix):
+def get_auth_session(token):
+    """
+    Creates session which overwrites the BA credentials set in the ~/.netrc file by auth token.
+    """
+    token_session = Session()
+    token_session.trust_env = False  # need to overwrite the authorization header, otherwise BA is used
+    token_session.headers.update({"Authorization": f"Bearer {token}"})
+    return token_session
+
+
+def update_catalogue_entry(stac_host, collection, entry_id, json_data, auth_token=None):
+    """
+    Updates stac entry by fully rewriting it
+    """
+    url = f"{stac_host}/collections/{collection}/items/{entry_id}"
+    print(f"Overwriting existing product entry in STAC catalogue.")
+
+    token = auth_token or get_auth_token(f"{stac_host}/auth")
+    token_session = get_auth_session(token)
+
+    response = token_session.put(url, data=json_data)
+    if not response.ok:
+        raise Exception(f"Could not remove existing product from catalogue.\n{response.text}")
+
+
+def upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_prefix, succ_prefix, overwrite=False):
     """
     Uploads the stac file to the catalogue.
     Reports progress in the preconfigured files suffixed by the current date.
@@ -289,9 +320,7 @@ def upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_pr
     with open(stac_filepath, 'r') as file:
         json_data = file.read()
         rundate = datetime.now().strftime('%Y-%m-%d')
-        token_session = Session()
-        token_session.trust_env = False  # need to overwrite the authorization header, otherwise BA is used
-        token_session.headers.update({"Authorization": f"Bearer {token}"})
+        token_session = get_auth_session(token)
         response = token_session.post(url, data=json_data)
 
         if response.ok:
@@ -304,8 +333,15 @@ def upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_pr
             create_missing_dir(os.path.dirname(err_file))
             with open(err_file, 'a') as f:
                 if response.status_code == 409:
-                    f.write(f"{collection},{product_id},{response.status_code},Product already registered.\n")
-                    print("Product already registered, skipping.")
+                    if not overwrite:
+                        f.write(f"{collection},{product_id},{response.status_code},Product already registered.\n")
+                        print("Product already registered, skipping.")
+                    else:
+                        if response.text and "Feature" in response.text and "ErrorMessage" in response.text:
+                            stac_product_id = response.json().get("ErrorMessage").split(" ")[1]
+                            update_catalogue_entry(stac_host, collection, stac_product_id, json_data, token)
+                        else:
+                            raise Exception("Cannot update existing entry, feature id expected in response not found.")
                 else:
                     f.write(f"{collection},{product_id},{response.status_code}\n")
                     raise Exception(f"Request to upload STAC file failed with {response.status_code}.\n{response.text}")
@@ -379,7 +415,7 @@ def main():
         regenerate_href_links(stac_filepath, metadata_dir, product_url)
 
         if args.push:
-            upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_prefix, succ_prefix)
+            upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_prefix, succ_prefix, overwrite=args.overwrite)
         print("Finished")
 
 
