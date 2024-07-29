@@ -75,6 +75,7 @@ def parse_arguments():
         raise Exception('--push or --save required to take any action')
     return args
 
+
 def read_configuration():
     """
     Read configuration file.
@@ -302,8 +303,12 @@ def upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_pr
             err_file = err_prefix + rundate
             create_missing_dir(os.path.dirname(err_file))
             with open(err_file, 'a') as f:
-                f.write(f"{collection},{product_id},{response.status_code}\n")
-            raise Exception(f"Request to upload STAC file failed with {response.status_code}.\n{response.text}")
+                if response.status_code == 409:
+                    f.write(f"{collection},{product_id},{response.status_code},Product already registered.\n")
+                    print("Product already registered, skipping.")
+                else:
+                    f.write(f"{collection},{product_id},{response.status_code}\n")
+                    raise Exception(f"Request to upload STAC file failed with {response.status_code}.\n{response.text}")
 
 
 def main():
