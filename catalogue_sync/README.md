@@ -1,4 +1,10 @@
-# Register Sentinel to STAC
+# Generate new list
+
+The **gen_new_list.py** generates a list of new product IDs in the DHuS database added since the last run
+of this script and saves. Otherwise, generates list of IDs from the last 30 days. The list of IDs is then
+stored in a file.
+
+# Register Sentinel to STAC catalogue
 
 The **register_stack.py** script fetches Sentinel 1, 2, 3 and 5P metadata from a data hub
 and transforms it into a [STAC](https://stacspec.org/en) format. It can publish the results to a STAC catalogue.

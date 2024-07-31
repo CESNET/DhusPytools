@@ -24,4 +24,3 @@ product_collection_mapping = {
     r'^S5[A-DP]_OFFL_L2_.*': 'sentinel-5p-l2',
     r'^S5[A-DP]_NRTI_L2_.*': 'sentinel-5p-l2',
 }
-config_file = "register_stac.yml"

@@ -24,6 +24,8 @@ from tqdm import tqdm
 
 import sentinel_stac
 
+CONFIG_FILE = "sentinel_config.yml"
+
 
 # Monkey-patch class method of Sentinel3 module to avoid casting error
 def new_ext(cls, obj: pystac.Asset, add_if_missing: bool = False):
@@ -37,7 +39,7 @@ def parse_arguments():
     """
     parser = argparse.ArgumentParser(
         description='Generate Sentinel 1, 2, 3 and 5P metadata in STAC format from data fetched from a Sentinel OData '
-                    'API. Configuration needs to be stored in register_stac.yml file and can be partly overwritten '
+                    'API. Configuration needs to be stored in sentinel_config.yml file and can be partly overwritten '
                     'by arguments. See README. The program requires --productId (-i) argument to be '
                     'provided and --save (-s) and/or --push (-p) option to be used. Example usage: '
                     './register_stac.py -p -i 72250006-4290-40ec-987d-3ed771e690f3')
@@ -56,10 +58,10 @@ def parse_arguments():
                         help='URL of server to push data to, for example https://stac.cesnet.cz.'
                              'Overwrites STAC_HOST configuration option.')
     parser.add_argument('-l',
-                        '--stacLocalDir',
+                        '--localDir',
                         required=False,
                         help='Local folder to which STAC json files shall be stored if --save option specified. '
-                             'Overwrites STAC_LOCAL_DIR configuration option.')
+                             'Overwrites LOCAL_DIR configuration option.')
     parser.add_argument('-p',
                         '--push',
                         required=False,
@@ -86,7 +88,7 @@ def read_configuration():
     """
     Read configuration file.
     """
-    with open(sentinel_stac.config_file, "r") as f:
+    with open(CONFIG_FILE, "r") as f:
         return yaml.safe_load(f)
 
 
@@ -132,7 +134,7 @@ def fetch_product_data(sentinel_host, product_id, metadata_dir):
     url = f"{sentinel_host}/odata/v1/Products('{product_id}')/Nodes"
     output_path = os.path.join(metadata_dir, "node.xml")
     request_with_progress(url, output_path)
-    with open(os.path.join(output_path), "rb") as f:
+    with open(output_path, "rb") as f:
         metadata = f.read()
         data = defusedxml.ElementTree.fromstring(metadata)
     namespaces = {'atom': 'http://www.w3.org/2005/Atom'}
@@ -355,11 +357,11 @@ def main():
     sentinel_host = args.sentinelHost or config.get("SENTINEL_HOST")
     stac_host = args.stacHost or config.get("STAC_HOST")
     check_hosts(sentinel_host, stac_host, args.push)
-    if args.save and config.get("STAC_LOCAL_DIR") is None and args.stacLocalDir is None:
-        raise Exception("Flag --save was provided, but STAC_LOCAL_DIR option not configured and not specified "
-                        "in the --stacLocalDir argument!")
+    if args.save and config.get("LOCAL_DIR") is None and args.localDir is None:
+        raise Exception("Flag --save was provided, but LOCAL_DIR option not configured and not specified "
+                        "in the --localDir argument!")
 
-    stac_storage = args.stacLocalDir or config.get("STAC_LOCAL_DIR")
+    stac_storage = args.localDir or os.path.join(config.get("LOCAL_DIR"), "register_stac")
     if stac_storage is not None:
         if not os.path.isabs(stac_storage):
             raise Exception("Valid path not used for the stac storage argument - expected an absolute directory path!")

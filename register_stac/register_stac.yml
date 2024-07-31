@@ -1,9 +1,0 @@
-# Example file for register_stac.py script configuration
-
-SENTINEL_HOST: "https://dhr1.cesnet.cz"
-STAC_HOST: "https://stac.cesnet.cz"
-
-STAC_LOCAL_DIR: "/var/tmp/stac/"
-
-SUCC_PREFIX: "/var/tmp/register-stac-success-"
-ERR_PREFIX: "/var/tmp/register-stac-error-"
