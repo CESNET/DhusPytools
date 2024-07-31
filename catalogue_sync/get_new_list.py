@@ -169,8 +169,9 @@ def main():
     missing_products = list(set(fetched_products) - set(stored_products))
     print_debug(f"There are {len(missing_products)} unprocessed products.")
 
-    store_new_timestamp(local_dir, new_timestamp)
-    store_new_list(local_dir, missing_products)
+    if not args.dryRun:
+        store_new_timestamp(local_dir, new_timestamp)
+        store_new_list(local_dir, missing_products)
 
 
 if __name__ == "__main__":

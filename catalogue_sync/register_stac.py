@@ -344,6 +344,9 @@ def upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_pr
                             update_catalogue_entry(stac_host, collection, stac_product_id, json_data, token)
                         else:
                             raise Exception("Cannot update existing entry, feature id expected in response not found.")
+                elif response.status_code == 404:
+                    f.write(f"{collection},{product_id},{response.status_code}\n")
+                    print("Stac catalogue returned 404, check, if collection exists!")
                 else:
                     f.write(f"{collection},{product_id},{response.status_code}\n")
                     raise Exception(f"Request to upload STAC file failed with {response.status_code}.\n{response.text}")
