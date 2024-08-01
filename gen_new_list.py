@@ -10,8 +10,8 @@ import yaml
 DEBUG = False
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 CONFIG_FILE = "sentinel_config.yml"
-LIST_FILENAME = "get_new_list_processed.txt"
-TIMESTAMP_FILENAME = "get_new_list_timestamp.txt"
+LIST_FILENAME = "gen_new_list_processed.txt"
+TIMESTAMP_FILENAME = "gen_new_list_timestamp.txt"
 
 
 def parse_arguments():
@@ -20,7 +20,7 @@ def parse_arguments():
     """
     parser = argparse.ArgumentParser(
         description='Generates a list of Sentinel products recently published at DHuS endpoint.'
-                    'Example usage: ./get_new_list.py')
+                    'Example usage: ./gen_new_list.py')
     parser.add_argument('-r',
                         '--dryRun',
                         required=False,
