@@ -16,6 +16,7 @@ import stactools.sentinel1.grd.stac
 import stactools.sentinel1.slc.stac
 import stactools.sentinel2.stac
 import stactools.sentinel3.stac
+from stactools.sentinel3 import constants
 import stactools.sentinel5p.stac
 import yaml
 from requests import Session
@@ -25,6 +26,7 @@ from tqdm import tqdm
 import sentinel_stac
 
 CONFIG_FILE = "sentinel_config.yml"
+stactools.sentinel3.constants.SRAL_L2_LAN_WAT_KEYS.remove("reducedMeasurementData")  # our data don't contain those files
 
 
 # Monkey-patch class method of Sentinel3 module to avoid casting error
