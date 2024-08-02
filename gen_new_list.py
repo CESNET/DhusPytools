@@ -40,7 +40,7 @@ def parse_arguments():
                         '--debug',
                         required=False,
                         action="store_true",
-                        help='Enable to see enable extended progress messages.')
+                        help='Enable to enable extended progress messages.')
 
     args = parser.parse_args()
     return args

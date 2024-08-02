@@ -1,0 +1,8 @@
+# Common scripts configuration
+SENTINEL_HOST: "https://dhr1.cesnet.cz"
+LOCAL_DIR: "/var/tmp/sentinel/"
+
+# register_stac.py variables
+SUCC_PREFIX: "/var/tmp/sentinel/register-stac-success-"
+ERR_PREFIX: "/var/tmp/sentinel/register-stac-error-"
+STAC_HOST: "https://stac.cesnet.cz"

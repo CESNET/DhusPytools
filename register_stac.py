@@ -26,8 +26,14 @@ from tqdm import tqdm
 import sentinel_stac
 
 CONFIG_FILE = "sentinel_config.yml"
-stactools.sentinel3.constants.SRAL_L2_LAN_WAT_KEYS.remove("reducedMeasurementData")  # our data don't contain those files
+ERR_PREFIX = ""
+SUCC_PREFIX = ""
+PRODUCT_ID = None
+COLLECTION = None
 
+# Stactools fixes
+# Our S3 data don't contain reducedMeasurementData
+stactools.sentinel3.constants.SRAL_L2_LAN_WAT_KEYS.remove("reducedMeasurementData")
 
 # Monkey-patch class method of Sentinel3 module to avoid casting error
 def new_ext(cls, obj: pystac.Asset, add_if_missing: bool = False):
@@ -82,8 +88,21 @@ def parse_arguments():
 
     args = parser.parse_args()
     if not args.push and not args.save:
-        raise Exception('--push or --save required to take any action')
+        die_with_error('--push or --save required to take any action')
     return args
+
+
+def die_with_error(msg, detailed_msg="", code=-1):
+    """
+    Before terminating with exception, writes message to error file.
+    Known HTTP error code should be used, otherwise -1 is used.
+    """
+    rundate = datetime.now().strftime('%Y-%m-%d')
+    err_file = ERR_PREFIX + rundate
+    create_missing_dir(os.path.dirname(err_file))
+    with open(err_file, 'a') as f:
+        f.write(f"{COLLECTION},{PRODUCT_ID},{code}:{msg}\n")
+    raise Exception("\n".join([f"{code}: {msg}", detailed_msg]))
 
 
 def read_configuration():
@@ -112,7 +131,7 @@ def request_with_progress(url, output_path):
     block_size = 1024  # Size of each block (1 KB)
 
     if not response.ok:
-        raise Exception(f"Request to fetch file: {url} failed with {response.status_code}.\n{response.text}")
+        die_with_error(f"Request to fetch file {url} failed.", response.text, response.status_code)
 
     progress_bar = tqdm(total=total_size,
                         unit='iB',
@@ -129,11 +148,11 @@ def request_with_progress(url, output_path):
     progress_bar.close()
 
 
-def fetch_product_data(sentinel_host, product_id, metadata_dir):
+def fetch_product_data(sentinel_host, metadata_dir):
     """
     Fetch Sentinel data for given product UUID from the specified host.
     """
-    url = f"{sentinel_host}/odata/v1/Products('{product_id}')/Nodes"
+    url = f"{sentinel_host}/odata/v1/Products('{PRODUCT_ID}')/Nodes"
     output_path = os.path.join(metadata_dir, "node.xml")
     request_with_progress(url, output_path)
     with open(output_path, "rb") as f:
@@ -147,17 +166,18 @@ def fetch_product_data(sentinel_host, product_id, metadata_dir):
     product_node = entry_node.find('atom:id', namespaces) if entry_node is not None else None
     product_url = product_node.text if product_node is not None else None
     platform = title[0:2] if title else None
-    collection = map_to_collection(title)
+    global COLLECTION
+    COLLECTION = map_to_collection(title)
 
     if not title or not product_url:
-        raise Exception(f"Missing required attributes for product {product_id}.")
+        die_with_error("Missing required title or product url for product.")
 
-    print(f"Parsed product data for product (UUID {product_id}):\n"
+    print(f"Parsed product data for product (UUID {PRODUCT_ID}):\n"
           f"*  Title ID: {title}\n"
           f"*  Platform: {platform}\n"
-          f"*  Collection: {collection}\n"
+          f"*  Collection: {COLLECTION}\n"
           f"*  Product URL: {product_url}")
-    return title, product_url, platform, collection
+    return title, product_url, platform
 
 
 def check_hosts(sentinel_host, stac_host, push):
@@ -165,19 +185,19 @@ def check_hosts(sentinel_host, stac_host, push):
     Checks sentinel_host and stac_host variables were resolved and .netrc file contains authentication credentials.
     """
     if not sentinel_host:
-        raise Exception("Sentinel host not configured properly!")
+        die_with_error("Sentinel host not configured properly!")
     if not stac_host and push:
-        raise Exception("STAC host not configured properly!")
+        die_with_error("STAC host not configured properly!")
 
     try:
         auth_info = netrc.netrc()
         if not auth_info.authenticators(urlparse(sentinel_host).netloc):
-            raise Exception(
+            die_with_error(
                 f"Host {urlparse(sentinel_host)} not found in authentication credentials in the .netrc file!")
         if push and not auth_info.authenticators(urlparse(stac_host).netloc):
-            raise Exception(f"Host {urlparse(stac_host)} not found in authentication credentials in the .netrc file!")
+            die_with_error(f"Host {urlparse(stac_host)} not found in authentication credentials in the .netrc file!")
     except (FileNotFoundError, netrc.NetrcParseError) as e:
-        raise Exception(f"Error parsing authentication file .netrc in the home directory: {e}")
+        die_with_error(f"Error parsing authentication file .netrc in the home directory.")
 
 
 def map_to_collection(product_name):
@@ -187,7 +207,7 @@ def map_to_collection(product_name):
     for pattern, collection in sentinel_stac.product_collection_mapping.items():
         if re.match(pattern, product_name):
             return collection
-    raise Exception("Could not match product to collection name! Probably missing in the sentinel_stac.py mappings.")
+    die_with_error("Could not match product to collection name! Probably missing in the sentinel_stac.py mappings.")
 
 
 def fetch_platform_metadata(product_url, metadata_dir, platform):
@@ -203,7 +223,7 @@ def fetch_platform_metadata(product_url, metadata_dir, platform):
     elif platform.lower() == "s5":
         platform_files = sentinel_stac.s5_files
     else:
-        raise Exception(f"Platform {platform} not supported!")
+        die_with_error(f"Platform {platform} not supported!")
     for file in platform_files:
         source_url = f"{product_url}/Nodes('{file}')/$value"
         output_file = os.path.join(metadata_dir, file)
@@ -282,7 +302,7 @@ def get_auth_token(token_url):
     """
     response = requests.get(token_url)
     if not response.ok:
-        raise Exception(f"Could not obtain API token from {token_url}")
+        die_with_error(f"Could not obtain API token from {token_url}", response.text, response.status_code)
     return response.json()["token"]
 
 
@@ -296,11 +316,11 @@ def get_auth_session(token):
     return token_session
 
 
-def update_catalogue_entry(stac_host, collection, entry_id, json_data, auth_token=None):
+def update_catalogue_entry(stac_host, entry_id, json_data, auth_token=None):
     """
     Updates stac entry by fully rewriting it
     """
-    url = f"{stac_host}/collections/{collection}/items/{entry_id}"
+    url = f"{stac_host}/collections/{COLLECTION}/items/{entry_id}"
     print(f"Overwriting existing product entry in STAC catalogue.")
 
     token = auth_token or get_auth_token(f"{stac_host}/auth")
@@ -308,15 +328,15 @@ def update_catalogue_entry(stac_host, collection, entry_id, json_data, auth_toke
 
     response = token_session.put(url, data=json_data)
     if not response.ok:
-        raise Exception(f"Could not remove existing product from catalogue.\n{response.text}")
+        die_with_error(f"Could not remove existing product from catalogue.", response.text, response.status_code)
 
 
-def upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_prefix, succ_prefix, overwrite=False):
+def upload_to_catalogue(stac_host, stac_filepath, overwrite=False):
     """
     Uploads the stac file to the catalogue.
     Reports progress in the preconfigured files suffixed by the current date.
     """
-    url = f"{stac_host}/collections/{collection}/items"
+    url = f"{stac_host}/collections/{COLLECTION}/items"
     print(f"Uploading STAC data to {url}")
 
     token = get_auth_token(f"{stac_host}/auth")
@@ -328,90 +348,95 @@ def upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_pr
         response = token_session.post(url, data=json_data)
 
         if response.ok:
-            succ_file = succ_prefix + rundate
+            succ_file = SUCC_PREFIX + rundate
             create_missing_dir(os.path.dirname(succ_file))
             with open(succ_file, 'a') as f:
-                f.write(f"{collection},{product_id}\n")
-        else:
-            err_file = err_prefix + rundate
-            create_missing_dir(os.path.dirname(err_file))
-            with open(err_file, 'a') as f:
-                if response.status_code == 409:
-                    if not overwrite:
-                        f.write(f"{collection},{product_id},{response.status_code},Product already registered.\n")
-                        print("Product already registered, skipping.")
-                    else:
-                        if response.text and "Feature" in response.text and "ErrorMessage" in response.text:
-                            stac_product_id = response.json().get("ErrorMessage").split(" ")[1]
-                            update_catalogue_entry(stac_host, collection, stac_product_id, json_data, token)
-                        else:
-                            raise Exception("Cannot update existing entry, feature id expected in response not found.")
-                elif response.status_code == 404:
-                    f.write(f"{collection},{product_id},{response.status_code}\n")
-                    print("Stac catalogue returned 404, check, if collection exists!")
+                f.write(f"{COLLECTION},{PRODUCT_ID}\n")
+        elif response.status_code == 409:
+            if not overwrite:
+                # don't die
+                err_file = ERR_PREFIX + rundate
+                create_missing_dir(os.path.dirname(err_file))
+                with open(err_file, 'a') as f:
+                    f.write(f"{COLLECTION},{PRODUCT_ID},0,Skipped existing product\n")
+                print("Product already registered, skipping.")
+            else:
+                if response.text and "Feature" in response.text and "ErrorMessage" in response.text:
+                    stac_product_id = response.json().get("ErrorMessage").split(" ")[1]
+                    update_catalogue_entry(stac_host, COLLECTION, stac_product_id, json_data, token)
                 else:
-                    f.write(f"{collection},{product_id},{response.status_code}\n")
-                    raise Exception(f"Request to upload STAC file failed with {response.status_code}.\n{response.text}")
+                    die_with_error("Cannot update existing entry, feature id expected in response not found.")
+        elif response.status_code == 404:
+            die_with_error("Wrong URL, or collection does not exist.", response.text, response.status_code)
+        else:
+            die_with_error(f"Request to upload STAC file failed", response.text, response.status_code)
 
 
 def main():
     args = parse_arguments()
     config = read_configuration()
-    product_id = args.productId
+    global PRODUCT_ID
+    PRODUCT_ID = args.productId
 
     sentinel_host = args.sentinelHost or config.get("SENTINEL_HOST")
     stac_host = args.stacHost or config.get("STAC_HOST")
-    check_hosts(sentinel_host, stac_host, args.push)
+
     if args.save and config.get("LOCAL_DIR") is None and args.localDir is None:
-        raise Exception("Flag --save was provided, but LOCAL_DIR option not configured and not specified "
-                        "in the --localDir argument!")
+        die_with_error("Flag --save was provided, but LOCAL_DIR option not configured and not specified "
+                       "in the --localDir argument!")
 
     stac_storage = args.localDir or os.path.join(config.get("LOCAL_DIR"), "register_stac")
     if stac_storage is not None:
         if not os.path.isabs(stac_storage):
-            raise Exception("Valid path not used for the stac storage argument - expected an absolute directory path!")
+            die_with_error("Valid path not used for the stac storage argument - expected an absolute directory path!")
         create_missing_dir(os.path.dirname(stac_storage))
 
-    succ_prefix = config.get("SUCC_PREFIX")
-    err_prefix = config.get("ERR_PREFIX")
-    if args.push and (succ_prefix is None or err_prefix is None):
-        raise Exception("Flag --push was provided, but SUCC_PREFIX and ERR_PREFIX need to be set in the configuration "
-                        "file for logging!")
+    global SUCC_PREFIX, ERR_PREFIX
+    SUCC_PREFIX = config.get("SUCC_PREFIX")
+    ERR_PREFIX = config.get("ERR_PREFIX")
+    if args.push and (SUCC_PREFIX is None or ERR_PREFIX is None):
+        die_with_error("Flag --push was provided, but SUCC_PREFIX and ERR_PREFIX need to be set in the configuration "
+                       "file for logging!")
 
     if args.push and not stac_host:
-        raise Exception('--push requires --stacHost argument or STAC_HOST configuration option to be set!')
+        die_with_error('--push requires --stacHost argument or STAC_HOST configuration option to be set!')
+
+    check_hosts(sentinel_host, stac_host, args.push)
 
     with (tempfile.TemporaryDirectory() as metadata_dir):
         print(f"Created temporary directory: {metadata_dir}")
 
-        title, product_url, platform, collection = fetch_product_data(sentinel_host, product_id, metadata_dir)
+        title, product_url, platform = fetch_product_data(sentinel_host, metadata_dir)
 
         metadata_dir = os.path.join(metadata_dir, title)
         os.mkdir(metadata_dir)
 
         fetch_platform_metadata(product_url, metadata_dir, platform)
 
-        if platform.lower() == "s1":
-            product_type = title.split("_")[2]
-            if product_type.lower() == "slc":
-                metadata = stactools.sentinel1.slc.stac.SLCMetadataLinks(metadata_dir)
-                fetch_nested_s1_files(metadata, product_url, metadata_dir)
-                item = stactools.sentinel1.slc.stac.create_item(granule_href=metadata_dir)
+        try:
+            if platform.lower() == "s1":
+                product_type = title.split("_")[2]
+                if product_type.lower() == "slc":
+                    metadata = stactools.sentinel1.slc.stac.SLCMetadataLinks(metadata_dir)
+                    fetch_nested_s1_files(metadata, product_url, metadata_dir)
+                    item = stactools.sentinel1.slc.stac.create_item(granule_href=metadata_dir)
+                else:
+                    metadata = stactools.sentinel1.grd.stac.MetadataLinks(metadata_dir)
+                    fetch_nested_s1_files(metadata, product_url, metadata_dir)
+                    item = stactools.sentinel1.grd.stac.create_item(granule_href=metadata_dir)
+            elif platform.lower() == "s2":
+                safe_manifest = stactools.sentinel2.stac.SafeManifest(metadata_dir)
+                fetch_nested_s2_files(safe_manifest, product_url, metadata_dir)
+                item = stactools.sentinel2.stac.create_item(granule_href=metadata_dir)
+            elif platform.lower() == "s3":
+                item = stactools.sentinel3.stac.create_item(granule_href=metadata_dir, skip_nc=True)
+            elif platform.lower() == "s5":
+                fetch_s5_metadata(product_url, title, metadata_dir)
+                item = stactools.sentinel5p.stac.create_item(os.path.join(metadata_dir, title))
             else:
-                metadata = stactools.sentinel1.grd.stac.MetadataLinks(metadata_dir)
-                fetch_nested_s1_files(metadata, product_url, metadata_dir)
-                item = stactools.sentinel1.grd.stac.create_item(granule_href=metadata_dir)
-        elif platform.lower() == "s2":
-            safe_manifest = stactools.sentinel2.stac.SafeManifest(metadata_dir)
-            fetch_nested_s2_files(safe_manifest, product_url, metadata_dir)
-            item = stactools.sentinel2.stac.create_item(granule_href=metadata_dir)
-        elif platform.lower() == "s3":
-            item = stactools.sentinel3.stac.create_item(granule_href=metadata_dir, skip_nc=True)
-        elif platform.lower() == "s5":
-            fetch_s5_metadata(product_url, title, metadata_dir)
-            item = stactools.sentinel5p.stac.create_item(os.path.join(metadata_dir, title))
-        else:
-            raise Exception(f"Unknown platform {platform}!")
+                raise Exception(f"Unknown platform {platform}")
+        except Exception as e:
+            die_with_error(e.args[0] if e.args and len(str(e.args[0])) > 5 else str(e))
 
         stac_storage = stac_storage if args.save else metadata_dir
         stac_filepath = os.path.join(stac_storage, "{}.json".format(item.id))
@@ -422,7 +447,7 @@ def main():
         regenerate_href_links(stac_filepath, metadata_dir, product_url)
 
         if args.push:
-            upload_to_catalogue(stac_host, collection, stac_filepath, product_id, err_prefix, succ_prefix, overwrite=args.overwrite)
+            upload_to_catalogue(stac_host, stac_filepath, overwrite=args.overwrite)
         print("Finished")
 
 
