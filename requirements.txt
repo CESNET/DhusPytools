@@ -9,3 +9,5 @@ stactools-sentinel5p @ git+https://github.com/stactools-packages/sentinel5p@a4d1
 tqdm~=4.66.4
 pyproj~=3.6.1
 netcdf4~=1.7.1post
+pystac~=1.10.1
+stactools~=0.5.3
