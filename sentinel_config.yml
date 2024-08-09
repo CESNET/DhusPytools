@@ -6,3 +6,4 @@ LOCAL_DIR: "/var/tmp/sentinel/"
 SUCC_PREFIX: "/var/tmp/sentinel/register-stac-success-"
 ERR_PREFIX: "/var/tmp/sentinel/register-stac-error-"
 STAC_HOST: "https://stac.cesnet.cz"
+SALT: "dhr1"  # if defined, will be used to prefix the ID

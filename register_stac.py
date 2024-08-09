@@ -272,7 +272,7 @@ def fetch_s5_metadata(product_url, title, metadata_dir):
     request_with_progress(url, output_file)
 
 
-def regenerate_href_links(stacfile_path, metadata_dir, product_url):
+def regenerate_href_links(stacfile_path, metadata_dir, product_url, salt):
     """
     Replaces href links in the final json containing the local path to contain the OData path and format.
     Cannot use stactools' create_item function parameters for this change, as the stac module is then actually reading
@@ -285,12 +285,18 @@ def regenerate_href_links(stacfile_path, metadata_dir, product_url):
     with (open(stacfile_path, 'r') as infile, open(new_file, 'w') as outfile):
         for line in infile:
             if metadata_dir in line:
+                # replace file links
                 split_line = line.split('"')  # [' ', 'href', ': ', 'matadata_dir/resource/path', '\n']
                 url_path_segments = split_line[-2].split(f"{metadata_dir}{'/'}")[1].split("/")
                 correct_link = product_url + ''.join(
                     f"/Nodes('{segment}')" for segment in url_path_segments) + "/$value"
                 split_line[-2] = correct_link
                 outfile.write('"'.join(split_line))
+            elif '"id":' in line and salt:
+                # prefix title, so unique UUID is generated if same product comes from different sources
+                split_line = line.split('": "')
+                salted_line = split_line[0] + '": "' + salt + split_line[1]
+                outfile.write(salted_line)
             else:
                 outfile.write(line)
     os.replace(new_file, stacfile_path)
@@ -398,6 +404,7 @@ def main():
         die_with_error("Flag --push was provided, but SUCC_PREFIX and ERR_PREFIX need to be set in the configuration "
                        "file for logging!")
 
+    salt = config.get("SALT")
     if args.push and not stac_host:
         die_with_error('--push requires --stacHost argument or STAC_HOST configuration option to be set!')
 
@@ -444,7 +451,7 @@ def main():
         print(f"Writing metadata to file: {stac_filepath}")
         item.save_object(dest_href=stac_filepath, include_self_link=False)
 
-        regenerate_href_links(stac_filepath, metadata_dir, product_url)
+        regenerate_href_links(stac_filepath, metadata_dir, product_url, salt)
 
         if args.push:
             upload_to_catalogue(stac_host, stac_filepath, overwrite=args.overwrite)
