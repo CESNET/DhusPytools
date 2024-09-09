@@ -34,3 +34,13 @@ configurable parameters: `./register_stack.py -h`
 
 **Authentication**: Basic auth is resolved automatically by the Requests library by reading a **~/.netrc** file. Make sure
 to set up the correct entries (Sentinel and STAC host URL) there.
+
+# Remove STAC entry
+Sometimes, data get removed in the odata catalogue (either expire, or were found invalid).
+Upon their deletion in the odata catalogue, we need to remove their STAC entry from a STAC catalogue.
+This script takes the product title (including prefix which was set on creation of the entry) and removes it
+from the STAC catalogue.
+
+### Configuration
+The configuration file is again in the **sentinel_config.yml**, where STAC host needs to be set and authentication 
+in the **~/.netrc** file must be provided.
