@@ -1,9 +1,13 @@
 # Common scripts configuration
 SENTINEL_HOST: "https://dhr1.cesnet.cz"
 LOCAL_DIR: "/var/tmp/sentinel/"
+SALT: "dhr1"  # if defined, will be used to prefix the ID (to resolve possible conflicts in the STAC catalogue)
 
 # register_stac.py variables
 SUCC_PREFIX: "/var/tmp/sentinel/register-stac-success-"
 ERR_PREFIX: "/var/tmp/sentinel/register-stac-error-"
-STAC_HOST: "https://stac.cesnet.cz"
-SALT: "dhr1"  # if defined, will be used to prefix the ID
+STAC_HOST: "https://resto-test.c-scale.zcu.cz"
+
+# remove_stac.py variables
+SUCC_PREFIX_REMOVAL: "/var/tmp/sentinel/remove-stac-success-"
+ERR_PREFIX_REMOVAL: "/var/tmp/sentinel/remove-stac-error-"
