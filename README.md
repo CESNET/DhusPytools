@@ -42,5 +42,10 @@ This script takes the product title (including prefix which was set on creation 
 from the STAC catalogue.
 
 ### Configuration
-The configuration file is again in the **sentinel_config.yml**, where STAC host needs to be set and authentication 
-in the **~/.netrc** file must be provided.
+**Configuration file** is again in the **sentinel_config.yml**, where STAC host and possible prefix needs to be set.
+
+**Authentication**: Basic auth is resolved automatically by the Requests library by reading a **~/.netrc** file. Make sure
+to set up the correct entry (STAC host URL) there.
+
+**Command line arguments**: The command line options supersede the configuration file settings. Run help to list all
+configurable parameters: `./remove_stac.py -h`
