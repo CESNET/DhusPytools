@@ -20,6 +20,9 @@ The **register_stack.py** script fetches Sentinel 1, 2, 3 and 5P metadata from a
 and transforms it into a [STAC](https://stacspec.org/en) format. It can publish the results to a STAC catalogue.
 The transformation is done by imported [stactools](https://github.com/stac-utils/stactools) modules.
 
+## Automatically update missing products to STAC
+**check_new_register_stac.py** calls previous scripts to fetch new products, transform them to STAC metadata and push them to the catalogue.
+
 ### Configuration
 There are several ways to configure the script's behaviour:
 
