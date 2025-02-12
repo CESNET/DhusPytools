@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 
 import argparse
+import netrc
 import os
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
 import requests
 import yaml
@@ -150,6 +152,22 @@ def store_new_list(local_dir, missing_products):
         f.write("\n".join(missing_products))
 
 
+def check_host(sentinel_host):
+    """
+    Checks sentinel_host variable was resolved and .netrc file contains authentication credentials.
+    """
+    if not sentinel_host:
+        raise Exception("Sentinel host not configured properly!")
+
+    try:
+        auth_info = netrc.netrc()
+        if not auth_info.authenticators(urlparse(sentinel_host).netloc):
+            raise Exception(
+                f"Host {urlparse(sentinel_host)} not found in authentication credentials in the .netrc file!")
+    except (FileNotFoundError, netrc.NetrcParseError):
+        raise Exception(f"Error parsing authentication file .netrc in the home directory.")
+
+
 def main():
     args = parse_arguments()
     config = read_configuration()
@@ -159,6 +177,7 @@ def main():
     sentinel_host = args.sentinelHost or config.get("SENTINEL_HOST")
     if not sentinel_host:
         raise Exception("SENTINEL_HOST is not defined and sentinelHost parameter not passed!")
+    check_host(sentinel_host)
     local_dir = config.get("LOCAL_DIR")
 
     timestamp = args.fromTimestamp or get_timestamp(local_dir)
