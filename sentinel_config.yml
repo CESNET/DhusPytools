@@ -5,5 +5,5 @@ LOCAL_DIR: "/var/tmp/sentinel/"
 # register_stac.py variables
 SUCC_PREFIX: "/var/tmp/sentinel/register-stac-success-"
 ERR_PREFIX: "/var/tmp/sentinel/register-stac-error-"
-STAC_HOST: "https://resto.c-scale.zcu.cz"
+STAC_HOST: "https://resto-test.cloud.cesnet.cz/"
 SALT: "dhr1"  # if defined, will be used to prefix the ID
