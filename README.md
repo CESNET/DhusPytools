@@ -37,25 +37,3 @@ configurable parameters: `./register_stack.py -h`
 
 **Authentication**: Basic auth is resolved automatically by the Requests library by reading a **~/.netrc** file. Make sure
 to set up the correct entries (Sentinel and STAC host URL) there.
-
-# Docker
-1. create `.env` file - this file propagate variables to .netrc file in container
-   example:
-```
-NETRC_MACHINE1=dhr1.cesnet.cz
-NETRC_LOGIN1=
-NETRC_PASSWORD1=
-
-NETRC_MACHINE2=resto.c-scale.zcu.cz
-NETRC_LOGIN2=
-NETRC_PASSWORD2=
-```
-2. build and run with docker compose (have to run directly in directory)
-   ```
-   docker compose build
-   ```
-   ```
-   docker compose up
-   ```
-3. all files from /var/tmp/sentinel are in /mnt/data/var/tmp/sentinel
-   - it can be change in ``` docker-compose.yaml```
