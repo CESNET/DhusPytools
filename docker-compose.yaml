@@ -1,0 +1,10 @@
+services:
+  app:
+    image: dhuspytools:0.1
+    build: .
+    volumes:
+      - /mnt/data/var/tmp/sentinel:/var/tmp/sentinel
+    env_file:
+      - path: ./.env
+        required: true
+
