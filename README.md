@@ -37,3 +37,30 @@ configurable parameters: `./register_stack.py -h`
 
 **Authentication**: Basic auth is resolved automatically by the Requests library by reading a **~/.netrc** file. Make sure
 to set up the correct entries (Sentinel and STAC host URL) there.
+
+# GSS user test activity 
+Automation of the COPE-SRCO-PL-2400437 GSS user test activity v1.1.
+Perform Odata queries: Odata filters, queries by attributes and nodes inspection for some products per each product type in a random way.
+
+## Installation
+```
+virtualenv .
+source bin/activate
+pip install -r requirements.txt
+```
+
+## Usage
+Example:
+```
+python user-test-activity3.py -b
+```
+
+Use with `-b` for basic auth file `.netrc` which contains `machine`, `login`, `password` records. See man curl.
+
+Use with `-t` for basic auth file `.token` which contains single `token` line.
+
+Use with `-k` for keycloak authentication. Credentials are read from the `.netrc`.
+
+Use `-d` to increase verbosity. Specify multiple times to increase more.
+
+Custom filters could be defined in `filters.txt` file.
