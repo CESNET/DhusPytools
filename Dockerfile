@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Clone repo with scripts
-RUN git clone https://github.com/CESNET/DhusPytools.git .
+RUN git clone --branch check_stac https://github.com/CESNET/DhusPytools.git .
 
 # Python dependecies
 RUN pip install --no-cache-dir -r requirements.txt
