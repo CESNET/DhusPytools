@@ -1,0 +1,6 @@
+# You can use comments
+$filter=startswith(Name,'S1') and Online eq True&$format=json&$top=10
+$filter=startswith(Name,'S2') and Online eq True&$format=json&$top=10
+$filter=startswith(Name,'S3') and Online eq True&$format=json&$top=10
+$filter=startswith(Name,'S5P') and Online eq True&$format=json&$top=10
+$filter=not (Collection/Name eq 'SENTINEL-2') and not contains(Name,'OPER_AUX') and ContentDate/Start gt 2025-01-03T00:00:00.000Z and ContentDate/Start lt 2025-02-03T00:10:00.000Z&$orderby=ContentDate/Start&$top=30
