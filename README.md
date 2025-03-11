@@ -1,5 +1,10 @@
 # Dependencies
-Install dependent libraries with `pip install -r requirements.txt`.
+Create python virtualenv and install dependent libraries.
+```
+virtualenv .
+source bin/activate
+pip install -r requirements.txt
+```
 
 # Generate new list
 The **gen_new_list.py** generates a list of new product IDs in the DHuS database added since the last run
@@ -42,13 +47,6 @@ to set up the correct entries (Sentinel and STAC host URL) there.
 Automation of the COPE-SRCO-PL-2400437 GSS user test activity v1.1.
 Perform Odata queries: Odata filters, queries by attributes and nodes inspection for some products per each product type in a random way.
 
-## Installation
-```
-virtualenv .
-source bin/activate
-pip install -r requirements.txt
-```
-
 ## Usage
 Example:
 ```
@@ -68,8 +66,7 @@ Custom filters could be defined in `filters.txt` file.
 # GSS Admin API Client
 To get full parameter list run
 ```
-source bin/activate
-python gss-admin-client.py -h
+gss-admin-client --help
 ```
 
 `.netrc` authentication is used as default.
@@ -79,14 +76,21 @@ You are required to change the `BASE_URL` within the script to match your admin-
 ## Example
 Get producers
 ```
-python gss-admin-client.py get producers
-python gss-admin-client.py get producers -n producer-name -p
+gss-admin-client get producers
+gss-admin-client get producers --name producer-name --pretty
+```
+
+Update existing entity takes name directly from the json file
+```
+gss-admin-client update producers --data-file datahub-producer-1.json
 ```
 
 Dump all entities
 ```
-python gss-admin-client.py dump
+gss-admin-client dump
 ```
+
+It is possible to feed output of get/dump back to the api again.
 
 ## Basic Auth
 To use basic authentication one should change the `auth` line in the script.
