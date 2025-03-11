@@ -64,3 +64,30 @@ Use with `-k` for keycloak authentication. Credentials are read from the `.netrc
 Use `-d` to increase verbosity. Specify multiple times to increase more.
 
 Custom filters could be defined in `filters.txt` file.
+
+# GSS Admin API Client
+To get full parameter list run
+```
+source bin/activate
+python gss-admin-client.py -h
+```
+
+`.netrc` authentication is used as default.
+
+You are required to change the `BASE_URL` within the script to match your admin-api url.
+
+## Example
+Get producers
+```
+python gss-admin-client.py get producers
+python gss-admin-client.py get producers -n producer-name -p
+```
+
+Dump all entities
+```
+python gss-admin-client.py dump
+```
+
+## Basic Auth
+To use basic authentication one should change the `auth` line in the script.
+
