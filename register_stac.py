@@ -293,9 +293,9 @@ def regenerate_href_links(stacfile_path, metadata_dir, product_url, salt):
                 split_line[-2] = correct_link
                 outfile.write('"'.join(split_line))
             elif '"id":' in line and salt:
-                # prefix title, so unique UUID is generated if same product comes from different sources
+                # prefix ID, so unique UUID is generated if same product comes from different sources
                 split_line = line.split('": "')
-                salted_line = split_line[0] + '": "' + salt + split_line[1]
+                salted_line = split_line[0] + '": "' + salt + PRODUCT_ID + '",\n'
                 outfile.write(salted_line)
             else:
                 outfile.write(line)
