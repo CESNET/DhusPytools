@@ -64,6 +64,13 @@ Use `-d` to increase verbosity. Specify multiple times to increase more.
 Custom filters could be defined in `filters.txt` file.
 
 # GSS Admin API Client
+Usage:
+```
+gss-admin-client [-h] [--name NAME] [--data-file DATA_FILE] [-d] [--pretty]
+    {get,create,update,delete,dump}
+    [{datastores/hfs,consumers,producers,quotas,metadatastores/solr,datastores/timebased,swiftcredentials,jobs,datastores/swiftgroup,datastores/swift}]
+```
+
 To get full parameter list run
 ```
 gss-admin-client --help
