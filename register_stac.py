@@ -288,6 +288,8 @@ def regenerate_href_links(stacfile_path, metadata_dir, product_url, salt):
                 # replace file links
                 split_line = line.split('"')  # [' ', 'href', ': ', 'matadata_dir/resource/path', '\n']
                 url_path_segments = split_line[-2].split(f"{metadata_dir}{'/'}")[1].split("/")
+                if url_path_segments[0] in product_url:
+                    url_path_segments = url_path_segments[1:]  # this is to fix S5p duplicate path nodes
                 correct_link = product_url + ''.join(
                     f"/Nodes('{segment}')" for segment in url_path_segments) + "/$value"
                 split_line[-2] = correct_link

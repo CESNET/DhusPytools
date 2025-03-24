@@ -78,7 +78,7 @@ def main():
                     error_code_str = error_info.split(":", 1)[0]
                     error_code = int(error_code_str)
                     if error_code >= 400 and error_code != 409:
-                        subprocess.run(["python3", "./register_stac.py", "-p", "-i", product_id])
+                        subprocess.run(["python3", "./register_stac.py", "-p", "-o", "-i", product_id])
                 except Exception as e:
                     print(f"Exception thrown during error file parsing\n{e}")
 
