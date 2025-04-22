@@ -4,6 +4,7 @@ import logging
 import os
 import argparse
 import HTTPAuthOptions
+import time
 
 # OData service base URL
 #BASE_URL = "https://dhr1.cesnet.cz/odata/v2"
@@ -48,22 +49,39 @@ def get_products(auth, queries):
 
     return products_by_query
 
-def download_value(entity, entity_id, auth, entity_type, node_ids=None):
-    """Download entity's $value (binary content) to tmp."""
+def download_value(entity, entity_id, auth, entity_type, node_ids=None, retries=3):
+    """Download entity's $value (binary content) to tmp. Retries on HTTP 429."""
     if entity_type == 'Nodes':
         url = f"{BASE_URL}/Products({entity_id})/{nodes_to_url(node_ids)}/$value"
     else:
         url = f"{BASE_URL}/{entity_type}({entity_id})/$value"
-    response = requests.get(url, auth=auth, stream=True)
 
-    if response.status_code == 200:
-        file_path = os.path.join(DOWNLOAD_DIR, f"{entity['Name']}")
-        with open(file_path, "wb") as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
-        logging.info(f"Downloaded {entity_type} {entity['Id']} to {file_path}")
-    else:
-        logging.error(f"Failed to download {entity_type} {entity['Id']} value: {response.status_code} {requests.status_codes._codes[response.status_code][0]}")
+    attempt = 0
+    while attempt <= retries:
+        response = requests.get(url, auth=auth, stream=True)
+
+        if response.status_code == 200:
+            file_path = os.path.join(DOWNLOAD_DIR, f"{entity['Name']}")
+            with open(file_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            logging.info(f"Downloaded {entity_type} {entity['Id']} to {file_path}")
+            return  # success, exit the function
+
+        elif response.status_code == 429:
+            attempt += 1
+            if attempt > retries:
+                break
+            wait_time = 20 * attempt  # exponential backoff
+            logging.warning(f"Received 429. Retrying in {wait_time} seconds... (Attempt {attempt}/{retries})")
+            time.sleep(wait_time)
+        else:
+            break  # don't retry on other status codes
+
+    logging.error(
+        f"Failed to download {entity_type} {entity['Id']} value: "
+        f"{response.status_code} {requests.status_codes._codes[response.status_code][0]}"
+    )
 
 def inspect_nodes(auth, product_id, node_id, depth=0, max_depth=1):
     """Recursively explore Nodes and download some of their $value."""
