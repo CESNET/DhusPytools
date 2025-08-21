@@ -141,7 +141,9 @@ def process_and_push_features(config, features):
     With a map of {collection: [features]}, splits features into sets of 10 features, obtains complete STAC metadata
     and pushes them to destination catalogue.
     """
-    logger.info(f"Pushing features to destination catalogue")
+    if len(features) > 0:
+        logger.info(f"Pushing features to destination catalogue")
+
     for collection, features in features.items():
         if features:
             logger.info(f"Pushing features of {collection} collection")
@@ -167,12 +169,11 @@ def push_features(config, collection, features):
     if not response.ok:
         if response.status_code == 409:
             # this seems not to be the case in bulk processing
-            logger.trace(response.text)
             logger.debug(f"Some features already exists in destination catalogue, skipping.")
         else:
             response.raise_for_status()
     else:
-        logger.debug(f"Pushed features to {collection}: {[f['properties']['name'] for f in features]}")
+        logger.info(f"Pushed features to {collection}: {[f['properties']['name'] for f in features]}")
 
 
 def get_month_range(date_str):
