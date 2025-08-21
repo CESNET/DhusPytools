@@ -1,0 +1,16 @@
+services:
+  stac-service:
+    container_name: stac-synchronizer
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - /etc/stac:/etc/stac
+      - /etc/test/stac_net:/root/.netrc
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    environment:
+      - LOG_LEVEL=INFO
