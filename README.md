@@ -102,3 +102,29 @@ It is possible to feed output of get/dump back to the api again.
 ## Basic Auth
 To use basic authentication one should change the `auth` line in the script.
 
+# Synchronize GSS Stac catalogue with Resto Stac catalogue
+This script fetches new products from GSS Stac catalogue and pushes them to Resto Stac catalogue.
+The collection names are the same (e.g. SENTINEL-1), and a new collection is created if it does not exist.
+Otherwise, the features are inserted in the existing collection.
+The configuration is expected to be located in the `/etc/stac/stac_sync_config.json` file. If it does not exist,
+the default configuration is used and stored in the file.
+Default configuration is:
+```
+{
+  "last_sync": "2017-01-01T00:00:00.00Z",
+  "source_catalog_url": "https://collgs.cesnet.cz/stac",
+  "dest_catalog_url": "https://stac.cesnet.cz",
+  "source_auth": {
+    "token_url": "https://keycloak.grid.cesnet.cz/realms/collgs/protocol/openid-connect/token",
+    "client_id": "token-exchange",
+    "grant_type": "password"
+  },
+  "dest_auth": {
+    "token_url": "https://stac.cesnet.cz/auth"
+  }
+}
+```
+
+The script fetches new products since the last sync time and updates the `last_sync` field in the configuration file.
+The basic auth credentials must be provided in the `.netrc` file.
+
