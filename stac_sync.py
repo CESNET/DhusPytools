@@ -266,6 +266,16 @@ def set_logger():
     )
 
 
+def renew_token(config):
+    """
+    Will refresh only Keycloak token for now, Resto tokens seem to have long-term validity
+    """
+    logger.debug("Renewing source token")
+    global SOURCE_TOKEN, SOURCE_SESSION
+    SOURCE_TOKEN = get_keycloak_token(config['source_auth'])
+    SOURCE_SESSION.headers.update({'Authorization': f'Bearer {SOURCE_TOKEN}'})
+
+
 def main():
     set_logger()
     config = load_config()
@@ -282,6 +292,7 @@ def main():
         if last_sync > TIMENOW:
             break
         try:
+            renew_token(config)  # for initial run which will run for hours
 
             logger.info(f"Fetching new features since {last_sync} till {sync_till}")
             features, count = fetch_new_features(
