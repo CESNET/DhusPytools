@@ -54,7 +54,7 @@ class FileBasedBasicAuth(HTTPBasicAuth):
             raise RuntimeError(f"Error reading {filepath}: {e}")
 
 class KeycloakTokenAuth(HTTPBearerAuth):
-    def __init__(self, server_url, realm, client_id, client_secret=None, netrc_file=None):
+    def __init__(self, server_url, realm, client_id, client_secret=None, netrc_file=None, username=None, password=None):
         logging.debug(f"Initializing {type(self)}")
         self.server_url = server_url
         self.realm = realm
@@ -62,7 +62,8 @@ class KeycloakTokenAuth(HTTPBearerAuth):
         self.client_secret = client_secret
         self.netrc_file = netrc_file
         self.token_url = f"{server_url}/realms/{realm}/protocol/openid-connect/token"
-        username, password = self._read_credentials()
+        if not (username and password):
+            username, password = self._read_credentials()
         self.token = self._get_token(username, password)
 
     def _read_credentials(self):
