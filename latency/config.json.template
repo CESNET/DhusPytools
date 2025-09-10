@@ -1,0 +1,31 @@
+{
+"local": {
+    "serviceRootUrl": "http://fe1.dhr.cesnet.cz/odata/v1",
+    "auth": {
+      "user": "user",
+      "password": "password",
+      "clientId": "gss",
+      "tokenEndpoint": "https://keycloak.grid.cesnet.cz",
+      "realm": "gss",
+      "type": "oauth2"
+    }
+},
+"source": {
+    "serviceRootUrl": "https://cda.copernicus.eu/cda/odata/v2",
+    "auth": {
+      "user": "user",
+      "password": "password",
+      "clientId": "gss",
+      "tokenEndpoint": "https://cda.copernicus.eu/auth",
+      "realm": "cda",
+      "type": "oauth2"
+    }
+},
+"productTypes": ["S1A", "S2A", "S2C", "S3"],
+"thresholds": {
+    "warnHours": 6,
+    "critHours": 12,
+    "unknownHours": 0
+},
+"netrcFile": "/tmp/netrc"
+}
