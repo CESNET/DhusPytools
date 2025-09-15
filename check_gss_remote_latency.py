@@ -90,6 +90,10 @@ def parse_args():
         default='latency/config.json',
         help="Path to JSON config file (default: %(default)s)"
     )
+    p.add_argument(
+        "-n", "--netrc",
+        help="Path to netrc file (default: %(default)s)"
+    )
     return p.parse_args()
 
 
@@ -113,7 +117,10 @@ if __name__ == '__main__':
         'unknown': timedelta(hours=config['thresholds']['unknownHours'])
     }
 
-    NETRC_FILE = config.get("netrcFile")
+    if args.netrc:
+        NETRC_FILE = args.netrc
+    else:
+        NETRC_FILE = config.get("netrcFile")
     
     # Auth using KeycloakTokenAuth
     AUTH_LOCAL = KeycloakTokenAuth(
