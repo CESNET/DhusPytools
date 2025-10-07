@@ -17,9 +17,9 @@ def parse_args():
         description="GSS last product date per type monitoring"
     )
     parser.add_argument(
-        "-o", "--order-by",
-        default="PublicationDate desc",
-        help="Order by clause (default: %(default)s)",
+        "-q", "--query",
+        default="$orderby=PublicationDate desc&$top=1",
+        help="OData query string (without leading '?'). (default: %(default)s)"
     )
     parser.add_argument(
         "-c", "--config",
@@ -34,16 +34,11 @@ def parse_iso_date(date_str):
     return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
 
 
-def check_latency(auth, odata_url, orderby, product_type):
-    params = {
-        "$orderby": orderby,
-        "$top": '1',
-        "$filter": f"startswith(Name,'{product_type}')"
-    }
+def check_latency(auth, odata_url, query_params):
     # Send request
     response = requests.get(
         url=odata_url + "/Products",
-        params=urllib.parse.urlencode(params, quote_via=urllib.parse.quote),
+        params=urllib.parse.urlencode(query_params, quote_via=urllib.parse.quote),
         headers={"Accept": "application/json"},
         auth=auth
     )
@@ -61,6 +56,18 @@ def check_latency(auth, odata_url, orderby, product_type):
 
     return latency_hours
 
+def prepare_query(custom_query, product_type):
+    query = custom_query.split('&')
+    params = {}
+    for param in query:
+        k, v = param.split('=')
+        params[k] = v
+    if "$filter" in params:
+        params["$filter"] = params["$filter"] + f" and startswith(Name,'{product_type}')"
+    else:
+        params["$filter"] = f"startswith(Name,'{product_type}')"
+    return params
+
 
 if __name__ == '__main__':
     args = parse_args()
@@ -71,7 +78,7 @@ if __name__ == '__main__':
     # Configuration
     config_local = config['local']
     odata_url = config_local['serviceRootUrl']
-    orderby = args.order_by
+    query = args.query
     netrc_file = config.get("netrcFile")
 
     if not netrc_file:
@@ -89,7 +96,8 @@ if __name__ == '__main__':
     latency_message = []
     for product_type in config['productTypes']:
         try:
-            latency_hours = check_latency(auth_local, odata_url, orderby, product_type)
+            query_params = prepare_query(query, product_type)
+            latency_hours = check_latency(auth_local, odata_url, query_params)
             if latency_hours is not None and latency_hours <= 72:
                 status_message.append(f"OK {product_type}: [{latency_hours}h]")
                 latency_message.append(f"{product_type}={latency_hours}")
