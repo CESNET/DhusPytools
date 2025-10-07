@@ -26,6 +26,10 @@ def parse_args():
         default='latency/config.json',
         help="Path to JSON config file (default: %(default)s)",
     )
+    parser.add_argument(
+        "-n", "--netrc",
+        help="Path to netrc file (default: %(default)s)"
+    )
     return parser.parse_args()
 
 
@@ -79,10 +83,11 @@ if __name__ == '__main__':
     config_local = config['local']
     odata_url = config_local['serviceRootUrl']
     query = args.query
-    netrc_file = config.get("netrcFile")
-
-    if not netrc_file:
-        raise Exception("Netrc file not specified.")
+    
+    if args.netrc:
+        netrc_file = args.netrc
+    else:
+        netrc_file = config.get("netrcFile")
 
     auth_local = KeycloakTokenAuth(
         server_url=config_local['auth']['tokenEndpoint'],
