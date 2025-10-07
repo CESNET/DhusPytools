@@ -1,111 +1,106 @@
 #!/usr/bin/env python3
 
+import argparse
+import json
+import logging
 import requests
 import sys
-from datetime import datetime, timezone
-import logging
-logging.basicConfig(level=logging.DEBUG)
+import urllib
 from HTTPAuthOptions import KeycloakTokenAuth
-import argparse
+from datetime import datetime, timezone
 
+
+logging.basicConfig(level=logging.DEBUG)
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Configure OData and Keycloak endpoints the check gss latency."
+        description="GSS last product date per type monitoring"
     )
     parser.add_argument(
-        "-u", "--odata-url",
-        #default="https://collgs.cesnet.cz/odata/v1/Products"
-        default="https://fe1.dhr.cesnet.cz/odata/v1/Products",
-        help="Base OData endpoint URL."
+        "-o", "--order-by",
+        default="PublicationDate desc",
+        help="Order by clause (default: %(default)s)",
     )
     parser.add_argument(
-        "-q", "--query",
-        default="?$orderby=PublicationDate desc&$top=1",
-        help="OData query string (include leading '?')."
-    )
-    parser.add_argument(
-        "-t", "--token-url",
-        default="https://keycloak.grid.cesnet.cz",
-        help="Keycloak base URL."
-    )
-    parser.add_argument(
-        "-r", "--realm",
-        #default="collgs"
-        default="dhr",
-        help="Keycloak realm."
-    )
-    parser.add_argument(
-        "-c", "--client-id",
-        default="gss",
-        help="Keycloak client ID."
-    )
-    parser.add_argument(
-        "-n", "--netrc-file",
-        default=None,
-        help="Path to custom netrc file."
+        "-c", "--config",
+        default='latency/config.json',
+        help="Path to JSON config file (default: %(default)s)",
     )
     return parser.parse_args()
+
 
 # Parse ISO 8601 UTC timestamp like "2025-06-06T08:12:16.630Z"
 def parse_iso_date(date_str):
     return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
 
 
+def check_latency(auth, odata_url, orderby, product_type):
+    params = {
+        "$orderby": orderby,
+        "$top": '1',
+        "$filter": f"startswith(Name,'{product_type}')"
+    }
+    # Send request
+    response = requests.get(
+        url=odata_url + "/Products",
+        params=urllib.parse.urlencode(params, quote_via=urllib.parse.quote),
+        headers={"Accept": "application/json"},
+        auth=auth
+    )
+    response.raise_for_status()
+    data = response.json()
+
+    # Extract and parse PublicationDate
+    last_pub_date_str = data["value"][0]["PublicationDate"]
+    last_pub_date = parse_iso_date(last_pub_date_str)
+
+    # Compute latency in hours
+    now = datetime.now(timezone.utc)
+    latency_seconds = int((now - last_pub_date).total_seconds())
+    latency_hours = latency_seconds // 3600
+
+    return latency_hours
+
+
 if __name__ == '__main__':
     args = parse_args()
 
-    # Configuration
-    ODATA_URL = args.odata_url
-    QUERY = args.query
+    with open(args.config) as file:
+        config = json.load(file)
 
-    # Keycloak credentials
-    TOKEN_URL = args.token_url
-    REALM = args.realm
-    CLIENT_ID = args.client_id
-    NETRC_FILE = args.netrc_file
-    
-    # Auth using KeycloakTokenAuth
-    AUTH = KeycloakTokenAuth(
-        server_url=TOKEN_URL,
-        realm=REALM,
-        client_id=CLIENT_ID,
-        netrc_file=NETRC_FILE,
+    # Configuration
+    config_local = config['local']
+    odata_url = config_local['serviceRootUrl']
+    orderby = args.order_by
+    netrc_file = config.get("netrcFile")
+
+    if not netrc_file:
+        raise Exception("Netrc file not specified.")
+
+    auth_local = KeycloakTokenAuth(
+        server_url=config_local['auth']['tokenEndpoint'],
+        realm=config_local['auth']['realm'],
+        client_id=config_local['auth']['clientId'],
+        netrc_file=netrc_file,
     )
 
-    try:
-        # Build full URL with query string
-        full_url = ODATA_URL + QUERY
+    statuscode = 0
+    status_message = []
+    latency_message = []
+    for product_type in config['productTypes']:
+        try:
+            latency_hours = check_latency(auth_local, odata_url, orderby, product_type)
+            if latency_hours is not None and latency_hours <= 72:
+                status_message.append(f"OK {product_type}: [{latency_hours}h]")
+                latency_message.append(f"{product_type}={latency_hours}")
+            else:
+                status_message.append(f"WARNING {product_type}: [{latency_hours}h]")
+                latency_message.append(f"{product_type}={latency_hours if latency_hours else '?'}")
+                statuscode = 1 if statuscode < 1 else statuscode
+        except Exception as e:
+            status_message.append(f"UNKNOWN {product_type}: Error {e}")
+            latency_message.append(f"{product_type}=?")
+            statuscode = 3
 
-        # Send request
-        response = requests.get(
-            full_url,
-            headers={"Accept": "application/json"},
-            auth=AUTH
-        )
-        response.raise_for_status()
-        data = response.json()
-
-        # Extract and parse PublicationDate
-        last_pub_date_str = data["value"][0]["PublicationDate"]
-        last_pub_date = parse_iso_date(last_pub_date_str)
-
-        # Compute latency in hours
-        now = datetime.now(timezone.utc)
-        latency_seconds = int((now - last_pub_date).total_seconds())
-        latency_hours = latency_seconds // 3600
-
-        # Nagios-compatible output
-        if latency_hours <= 72:
-            print(f"OK - Latest publication: {latency_hours}[h] ago | latency={latency_hours}")
-            sys.exit(0)
-        elif latency_hours > 72:
-            print(f"WARNING - Latest publication from {last_pub_date.isoformat()} | latency={latency_hours}")
-            sys.exit(1)
-        else:
-            print("UNKNOWN")
-            sys.exit(3)
-
-    except Exception as e:
-        print(f"UNKNOWN - Error: {e}")
-        sys.exit(3)
+    print(f"{', '.join(status_message)} | {' '.join(latency_message)}")
+    sys.exit(statuscode)
