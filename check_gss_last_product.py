@@ -108,11 +108,11 @@ if __name__ == '__main__':
                 latency_message.append(f"{product_type}={latency_hours}")
             else:
                 status_message.append(f"WARNING {product_type}: [{latency_hours}h]")
-                latency_message.append(f"{product_type}={latency_hours if latency_hours else '?'}")
+                latency_message.append(f"{product_type}={latency_hours if latency_hours else -1}")
                 statuscode = 1 if statuscode < 1 else statuscode
         except Exception as e:
             status_message.append(f"UNKNOWN {product_type}: Error {e}")
-            latency_message.append(f"{product_type}=?")
+            latency_message.append(f"{product_type}=-1")
             statuscode = 3
 
     print(f"{', '.join(status_message)} | {' '.join(latency_message)}")
