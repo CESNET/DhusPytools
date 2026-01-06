@@ -50,7 +50,9 @@ class GssProducts:
             return product['filter']
 
     def get_first_product(self):
-        return GssProduct(self.products[0])
+        if len(self.products) > 0:
+            return GssProduct(self.products[0])
+        return None
 
 
 class GssProduct:
