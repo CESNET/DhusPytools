@@ -50,6 +50,8 @@ def check_latency(auth, odata_url, query_params):
     data = response.json()
 
     # Extract and parse PublicationDate
+    if len(data["value"]) < 1:
+        raise Exception("No product of this type present in the catalogue")
     last_pub_date_str = data["value"][0]["PublicationDate"]
     last_pub_date = parse_iso_date(last_pub_date_str)
 
