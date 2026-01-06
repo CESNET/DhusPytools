@@ -21,6 +21,10 @@
       "type": "oauth2"
     }
 },
+"kubernetes":
+  {
+    "namespace": "default"
+  },
 "productTypes": ["S1A", "S2A", "S2C", "S3"],
 "thresholds": {
     "warnHours": 6,

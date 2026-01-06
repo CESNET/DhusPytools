@@ -1,12 +1,13 @@
 # vim: ai et sw=4 ts=4
-# Author: fous <honza801@gmail.com> 2023, 2025
-from latency.products import GssProducts
+# Author: fous <honza801@gmail.com> 2023, 2025, 2026
+from latency.products import GssSiteRegistry
 #from latency.dhusparser import DhusConfig
+import latency.ingester
 import logging
 from datetime import timedelta
 import sys
 import json
-from HTTPAuthOptions import KeycloakTokenAuth
+from HTTPAuthOptions import HTTPAuthRegistry
 import argparse
 
 
@@ -14,12 +15,18 @@ class NagiosChecker:
 
     results = {}
 
-    def __init__(self, site_local, thresholds, site_remote=None):
-        self.site_local = site_local
-        self.site_remote = site_remote
+    def __init__(self, config_local, thresholds, namespace):
+        self.http_auth_registry = HTTPAuthRegistry()
+        auth_local = self.http_auth_registry.add(config_local['auth'])
+
+        self.site_registry = GssSiteRegistry()
+        self.site_local = self.site_registry.get(config_local['serviceRootUrl'], auth=auth_local)
+
         self.warn = thresholds['warn']
         self.crit = thresholds['crit']
         self.unknown = thresholds['unknown']
+
+        self.namespace = namespace
 
     """
     Walks through all active synchronizers in dhus config file (dhus.xml)
@@ -50,15 +57,24 @@ class NagiosChecker:
         self.site_local.load({'type': product_type})
         product_local = self.site_local.get_first_product()
         logging.debug(product_local)
-        
+
         try:
-            self.site_remote.load({'id': product_local.get_id()})
-            product_remote = self.site_remote.get_first_product()
+            producer = latency.ingester.get_producer_entity_from_product_type(
+                namespace=self.namespace,
+                product_type=product_type.lower(),
+            )
+            
+            auth = self.http_auth_registry.get_by_token_endpoint(producer['source']['auth'])
+            site_remote = self.site_registry.get(producer['source']['serviceRootUrl'], auth)
+            
+            site_remote.load({'id': product_local.get_id()})
+            product_remote = site_remote.get_first_product()
             logging.debug(product_remote)
 
             self.results[product_type] = product_local.compare_publication_date(product_remote)
-        except:
+        except Exception as e:
             self.results[product_type] = timedelta(minutes=-1)
+            logging.debug(f'Error {e}')
 
     def format_result_output(self):
         ecode = 0
@@ -94,22 +110,24 @@ def parse_args():
         "-n", "--netrc",
         help="Path to netrc file (default: %(default)s)"
     )
+    p.add_argument(
+        "-d", "--debug",
+        action="store_true",
+        help="Enable debug output",
+    )
     return p.parse_args()
 
 
 if __name__ == '__main__':
+    args = parse_args()
+	
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG if args.debug else logging.INFO,
         #filename='/var/dhus/latency-monitoring.log',
         format='%(asctime)s %(message)s')
 
-    args = parse_args()
-	
     with open(args.config) as file:
         config = json.load(file)
-
-    config_local = config['local']
-    config_remote = config['source']
 
     thresholds = {
         'warn': timedelta(hours=config['thresholds']['warnHours']),
@@ -122,24 +140,8 @@ if __name__ == '__main__':
     else:
         NETRC_FILE = config.get("netrcFile")
     
-    # Auth using KeycloakTokenAuth
-    AUTH_LOCAL = KeycloakTokenAuth(
-        server_url=config_local['auth']['tokenEndpoint'],
-        realm=config_local['auth']['realm'],
-        client_id=config_local['auth']['clientId'],
-        netrc_file=NETRC_FILE,
-    )
-    AUTH_REMOTE = KeycloakTokenAuth(
-        server_url=config_remote['auth']['tokenEndpoint'],
-        realm=config_remote['auth']['realm'],
-        client_id=config_remote['auth']['clientId'],
-        netrc_file=NETRC_FILE,
-    )
-
-    site_local = GssProducts(config_local['serviceRootUrl'], auth=AUTH_LOCAL)
-    site_remote = GssProducts(config_remote['serviceRootUrl'], auth=AUTH_REMOTE)
-    nag = NagiosChecker(site_local, thresholds, site_remote)
-    
+    nag = NagiosChecker(config['local'], thresholds, config['kubernetes']['namespace'])
+        
     for product_type in config['productTypes']:
         nag.check_gss_product(product_type)
 
