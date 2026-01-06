@@ -59,9 +59,9 @@ class NagiosChecker:
         logging.debug(product_local)
 
         try:
-            producer = latency.ingester.get_producer_entity_from_product_type(
+            producer = latency.ingester.get_producer_entity_from_product_type_with_variants(
                 namespace=self.namespace,
-                product_type=product_type.lower(),
+                product_type=product_type,
             )
             
             auth = self.http_auth_registry.get_by_token_endpoint(producer['source']['auth'])

@@ -1,8 +1,8 @@
 import json
+import logging
 import subprocess
 from typing import Any
 import requests
-import logging
 
 
 ADMIN_API_BASE_URL = "https://gss.vm.cesnet.cz/gss-admin-api"
@@ -46,6 +46,7 @@ def get_config_file_from_ingester(
     #     )
 
     deployment = items[0]
+    logging.debug(f"Found deployment {deployment['metadata']['name']} for selector {label_selector}")
 
     # 2️⃣ Find ConfigMap name for the given volume
     volumes = deployment["spec"]["template"]["spec"].get("volumes", [])
@@ -142,11 +143,49 @@ def get_producer_entity_from_product_type(namespace: str, product_type: str):
     return producer_entity
 
 
+def get_producer_entity_from_product_type_with_variants(
+    namespace: str,
+    product_type: str,
+):
+    """Try fetching producer entity using common sentinel label variants."""
+
+    candidates: list[str] = []
+
+    def _add_candidate(value: str):
+        if value and value not in candidates:
+            candidates.append(value)
+
+    _add_candidate(product_type)
+    _add_candidate(product_type.lower())
+    _add_candidate(product_type[:-1])
+    _add_candidate(product_type[:-1].lower())
+
+    last_exception: Exception | None = None
+
+    for label in candidates:
+        logging.debug(f"Trying sentinel label '{label}'")
+        try:
+            entity = get_producer_entity_from_product_type(
+                namespace=namespace,
+                product_type=label,
+            )
+            logging.debug(f"Found producer entity using label '{label}'")
+            return entity
+        except Exception as exc:  # noqa: BLE001 - surface root errors and try next variant
+            logging.debug(f"Attempt to find producer with label '{label}' failed: {exc}")
+            last_exception = exc
+
+    raise RuntimeError(
+        f"Could not fetch producer entity for product type '{product_type}' "
+        f"using candidates {candidates}"
+    ) from last_exception
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
-    producer_entity = get_producer_entity_from_product_type(
+    producer_entity = get_producer_entity_from_product_type_with_variants(
         namespace="relay",
-        product_type="s2a"
+        product_type="S2A"
     )
 
     print(json.dumps(producer_entity, indent=2))
