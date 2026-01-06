@@ -8,11 +8,34 @@ from datetime import datetime
 import json
 from HTTPAuthOptions import KeycloakTokenAuth
 
+
+class GssSiteRegistry:
+    """Registry for product classes to allow simple lookup and instantiation."""
+
+    def __init__(self):
+        self._registry = {}
+
+    def add(self, url, auth):
+        if url in self._registry:
+            raise ValueError(f"Site '{url}' already registered")
+        site = GssProducts(url, auth)
+        self._registry[url] = site
+        return site
+
+    def get(self, url, auth=None):
+        site = self._registry.get(url)
+        if not site:
+            return self.add(url, auth)
+        logging.debug(f'Using existing product site instance for {url}')
+        return site
+
+
 class GssProducts:
     
     def __init__(self, url, auth=None, product={}):
-        self.url = url+'/Products'
+        self.url = url.rstrip("/") + "/Products"
         self.auth = auth
+        logging.debug(f'GssProducts intialized for url {self.url}')
         if product:
             self.load(product)
 
@@ -67,7 +90,9 @@ class GssProduct:
         return datetime.fromisoformat(self.jsonpart.get('PublicationDate'))
     
     def compare_publication_date(self, product):
-        return self.get_publication_date() - product.get_publication_date()
+        publication_delta = self.get_publication_date() - product.get_publication_date()
+        logging.debug(f'Publication delta for {self.get_id()} {product.get_id()} is {publication_delta}')
+        return publication_delta
 
     def __repr__(self):
         return f'Id:{self.get_id()} PublicationDate:{self.get_publication_date()}'
