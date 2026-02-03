@@ -12,7 +12,8 @@ INGESTER_CONFIG_FILENAME = "database-configuration-for-ingestion.properties"
 
 def run_kubectl_json(cmd: list[str]) -> Any:
     """Run kubectl and parse JSON output."""
-    logging.debug(f"Running {" ".join(cmd)}")
+    cmd_str = " ".join(cmd)
+    logging.debug(f"Running {cmd_str}")
     output = subprocess.check_output(cmd, text=True)
     return json.loads(output)
 
