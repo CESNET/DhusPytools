@@ -12,6 +12,7 @@ INGESTER_CONFIG_FILENAME = "database-configuration-for-ingestion.properties"
 
 def run_kubectl_json(cmd: list[str]) -> Any:
     """Run kubectl and parse JSON output."""
+    logging.debug(f"Running {" ".join(cmd)}")
     output = subprocess.check_output(cmd, text=True)
     return json.loads(output)
 
@@ -19,8 +20,9 @@ def run_kubectl_json(cmd: list[str]) -> Any:
 def get_config_file_from_ingester(
     namespace: str,
     label_selector: str,
-    volume_name: str=INGESTER_VOLUME_NAME,
-    filename: str=INGESTER_CONFIG_FILENAME,
+    volume_name: str = INGESTER_VOLUME_NAME,
+    filename: str = INGESTER_CONFIG_FILENAME,
+    kubeconfig: str | None = None,
 ) -> str:
     """
     Resolve ConfigMap backing a given volume from a Deployment selected
@@ -28,12 +30,16 @@ def get_config_file_from_ingester(
     """
 
     # 1️⃣ Get deployments by label
-    deployments = run_kubectl_json([
-        "kubectl", "get", "deploy",
+    deploy_cmd = ["kubectl"]
+    if kubeconfig:
+        deploy_cmd.extend(["--kubeconfig", kubeconfig])
+    deploy_cmd.extend([
+        "get", "deploy",
         "-n", namespace,
         "-l", label_selector,
         "-o", "json",
     ])
+    deployments = run_kubectl_json(deploy_cmd)
 
     items = deployments.get("items", [])
     if not items:
@@ -64,11 +70,15 @@ def get_config_file_from_ingester(
         )
 
     # 3️⃣ Fetch ConfigMap
-    configmap = run_kubectl_json([
-        "kubectl", "get", "configmap", configmap_name,
+    configmap_cmd = ["kubectl"]
+    if kubeconfig:
+        configmap_cmd.extend(["--kubeconfig", kubeconfig])
+    configmap_cmd.extend([
+        "get", "configmap", configmap_name,
         "-n", namespace,
         "-o", "json",
     ])
+    configmap = run_kubectl_json(configmap_cmd)
 
     data = configmap.get("data", {})
     if filename not in data:
@@ -128,10 +138,15 @@ def get_producer_entity(producer_name: str) -> dict[str, Any]:
         raise RuntimeError("Invalid JSON response from GSS admin API") from exc
 
 
-def get_producer_entity_from_product_type(namespace: str, product_type: str):
+def get_producer_entity_from_product_type(
+    namespace: str,
+    product_type: str,
+    kubeconfig: str | None = None,
+):
     config_content = get_config_file_from_ingester(
         namespace=namespace,
         label_selector=f"cdh-ingest.sentinel={product_type}",
+        kubeconfig=kubeconfig,
     )
     
     #print("---- configuration file ----")
@@ -146,6 +161,7 @@ def get_producer_entity_from_product_type(namespace: str, product_type: str):
 def get_producer_entity_from_product_type_with_variants(
     namespace: str,
     product_type: str,
+    kubeconfig: str | None = None,
 ):
     """Try fetching producer entity using common sentinel label variants."""
 
@@ -168,6 +184,7 @@ def get_producer_entity_from_product_type_with_variants(
             entity = get_producer_entity_from_product_type(
                 namespace=namespace,
                 product_type=label,
+                kubeconfig=kubeconfig,
             )
             logging.debug(f"Found producer entity using label '{label}'")
             return entity

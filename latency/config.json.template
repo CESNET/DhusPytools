@@ -23,7 +23,8 @@
 },
 "kubernetes":
   {
-    "namespace": "default"
+    "namespace": "default",
+    "kubeconfig": "/tmp/kube-config"
   },
 "productTypes": ["S1A", "S2A", "S2C", "S3"],
 "thresholds": {

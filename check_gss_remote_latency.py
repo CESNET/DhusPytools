@@ -15,7 +15,7 @@ class NagiosChecker:
 
     results = {}
 
-    def __init__(self, config_local, thresholds, namespace):
+    def __init__(self, config_local, thresholds, namespace, kubeconfig=None):
         self.http_auth_registry = HTTPAuthRegistry()
         auth_local = self.http_auth_registry.add(config_local['auth'])
 
@@ -27,6 +27,7 @@ class NagiosChecker:
         self.unknown = thresholds['unknown']
 
         self.namespace = namespace
+        self.kubeconfig = kubeconfig
 
     """
     Walks through all active synchronizers in dhus config file (dhus.xml)
@@ -62,6 +63,7 @@ class NagiosChecker:
             producer = latency.ingester.get_producer_entity_from_product_type_with_variants(
                 namespace=self.namespace,
                 product_type=product_type,
+                kubeconfig=self.kubeconfig,
             )
             
             auth = self.http_auth_registry.get_by_token_endpoint(producer['source']['auth'])
@@ -140,7 +142,12 @@ if __name__ == '__main__':
     else:
         NETRC_FILE = config.get("netrcFile")
     
-    nag = NagiosChecker(config['local'], thresholds, config['kubernetes']['namespace'])
+    nag = NagiosChecker(
+        config['local'],
+        thresholds,
+        config.get('kubernetes', {}).get('namespace'),
+        config.get('kubernetes', {}).get('kubeconfig'),
+    )
         
     for product_type in config['productTypes']:
         nag.check_gss_product(product_type)
