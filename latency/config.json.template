@@ -26,6 +26,11 @@
     "namespace": "default",
     "kubeconfig": "/tmp/kube-config"
   },
+"admin-api": {
+  "base_url": "https://gss.admin-api.site/gss-admin-api",
+  "user": "apiuser",
+  "password": "apipassword"
+},
 "productTypes": ["S1A", "S2A", "S2C", "S3"],
 "thresholds": {
     "warnHours": 6,

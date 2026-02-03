@@ -2,7 +2,7 @@
 # Author: fous <honza801@gmail.com> 2023, 2025, 2026
 from latency.products import GssSiteRegistry
 #from latency.dhusparser import DhusConfig
-import latency.ingester
+from latency.ingester import Ingester
 import logging
 from datetime import timedelta
 import sys
@@ -15,7 +15,7 @@ class NagiosChecker:
 
     results = {}
 
-    def __init__(self, config_local, thresholds, namespace, kubeconfig=None):
+    def __init__(self, config_local, thresholds, namespace, kubeconfig=None, admin_api=None):
         self.http_auth_registry = HTTPAuthRegistry()
         auth_local = self.http_auth_registry.add(config_local['auth'])
 
@@ -28,6 +28,14 @@ class NagiosChecker:
 
         self.namespace = namespace
         self.kubeconfig = kubeconfig
+        admin_api = admin_api or {}
+        self.ingester = Ingester(
+            namespace=self.namespace,
+            kubeconfig=self.kubeconfig,
+            admin_api_base_url=admin_api.get("base_url"),
+            admin_api_user=admin_api.get("user"),
+            admin_api_password=admin_api.get("password"),
+        )
 
     """
     Walks through all active synchronizers in dhus config file (dhus.xml)
@@ -60,10 +68,8 @@ class NagiosChecker:
         logging.debug(product_local)
 
         try:
-            producer = latency.ingester.get_producer_entity_from_product_type_with_variants(
-                namespace=self.namespace,
+            producer = self.ingester.get_producer_entity_from_product_type_with_variants(
                 product_type=product_type,
-                kubeconfig=self.kubeconfig,
             )
             
             auth = self.http_auth_registry.get_by_token_endpoint(producer['source']['auth'])
@@ -147,6 +153,7 @@ if __name__ == '__main__':
         thresholds,
         config.get('kubernetes', {}).get('namespace'),
         config.get('kubernetes', {}).get('kubeconfig'),
+        config.get('admin-api', {}),
     )
         
     for product_type in config['productTypes']:
